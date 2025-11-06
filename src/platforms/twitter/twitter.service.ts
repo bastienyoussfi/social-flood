@@ -44,7 +44,9 @@ export class TwitterService {
       // Step 1: Upload media if present
       let mediaIds: string[] = [];
       if (content.media && content.media.length > 0) {
-        this.logger.log(`Processing ${content.media.length} media attachment(s)`);
+        this.logger.log(
+          `Processing ${content.media.length} media attachment(s)`,
+        );
 
         // Validate media before attempting upload
         const mediaValidation = this.mediaService.validateMedia(content.media);
@@ -56,7 +58,9 @@ export class TwitterService {
 
         // Upload media
         mediaIds = await this.mediaService.uploadMedia(content.media);
-        this.logger.log(`Successfully uploaded ${mediaIds.length} media item(s)`);
+        this.logger.log(
+          `Successfully uploaded ${mediaIds.length} media item(s)`,
+        );
       }
 
       // Step 2: Prepare tweet text

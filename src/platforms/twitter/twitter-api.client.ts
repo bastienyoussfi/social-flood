@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TwitterApi, TweetV2PostTweetResult, ApiResponseError } from 'twitter-api-v2';
+import {
+  TwitterApi,
+  TweetV2PostTweetResult,
+  ApiResponseError,
+} from 'twitter-api-v2';
 import {
   TwitterConfig,
   TwitterPostResult,
@@ -28,16 +32,19 @@ export class TwitterApiClient {
    */
   private loadConfig(): TwitterConfig {
     const apiKey = this.configService.get<string>('TWITTER_API_KEY') || '';
-    const apiSecret = this.configService.get<string>('TWITTER_API_SECRET') || '';
-    const accessToken = this.configService.get<string>('TWITTER_ACCESS_TOKEN') || '';
-    const accessTokenSecret = this.configService.get<string>('TWITTER_ACCESS_TOKEN_SECRET') || '';
+    const apiSecret =
+      this.configService.get<string>('TWITTER_API_SECRET') || '';
+    const accessToken =
+      this.configService.get<string>('TWITTER_ACCESS_TOKEN') || '';
+    const accessTokenSecret =
+      this.configService.get<string>('TWITTER_ACCESS_TOKEN_SECRET') || '';
     const bearerToken = this.configService.get<string>('TWITTER_BEARER_TOKEN');
 
     // Validate required OAuth 1.0a credentials
     if (!apiKey || !apiSecret || !accessToken || !accessTokenSecret) {
       throw new Error(
         'Twitter OAuth 1.0a credentials are not properly configured. ' +
-        'Please set TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, and TWITTER_ACCESS_TOKEN_SECRET',
+          'Please set TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, and TWITTER_ACCESS_TOKEN_SECRET',
       );
     }
 
@@ -78,9 +85,14 @@ export class TwitterApiClient {
    * @param mediaIds - Array of uploaded media IDs
    * @returns Tweet ID and URL
    */
-  async postTweet(text: string, mediaIds?: string[]): Promise<TwitterPostResult> {
+  async postTweet(
+    text: string,
+    mediaIds?: string[],
+  ): Promise<TwitterPostResult> {
     try {
-      this.logger.log(`Posting tweet: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+      this.logger.log(
+        `Posting tweet: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
+      );
 
       const tweetData: any = { text };
 
@@ -93,7 +105,8 @@ export class TwitterApiClient {
       }
 
       // Post the tweet using v2 API
-      const result: TweetV2PostTweetResult = await this.client.v2.tweet(tweetData);
+      const result: TweetV2PostTweetResult =
+        await this.client.v2.tweet(tweetData);
 
       if (!result.data?.id) {
         throw new Error('Twitter API returned no tweet ID');
@@ -145,7 +158,9 @@ export class TwitterApiClient {
       }
 
       if (error.code === 403) {
-        throw new Error('Twitter authentication failed. Please check your credentials.');
+        throw new Error(
+          'Twitter authentication failed. Please check your credentials.',
+        );
       }
 
       if (error.code === 400) {
@@ -157,7 +172,9 @@ export class TwitterApiClient {
 
     // Generic error
     this.logger.error('Unexpected error posting to Twitter', error.stack);
-    throw new Error(`Failed to post to Twitter: ${error.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to post to Twitter: ${error.message || 'Unknown error'}`,
+    );
   }
 
   /**
