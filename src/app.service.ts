@@ -14,7 +14,9 @@ export class AppService {
   ) {}
 
   async getHealth() {
-    const dbStatus = this.connection.isInitialized ? 'connected' : 'disconnected';
+    const dbStatus = this.connection.isInitialized
+      ? 'connected'
+      : 'disconnected';
 
     return {
       status: 'ok',

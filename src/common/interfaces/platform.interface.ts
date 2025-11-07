@@ -41,7 +41,9 @@ export interface PlatformAdapter {
   /**
    * Validate content against platform requirements
    */
-  validateContent(content: PostContent): Promise<{ valid: boolean; errors?: string[] }>;
+  validateContent(
+    content: PostContent,
+  ): Promise<{ valid: boolean; errors?: string[] }>;
 
   /**
    * Get the status of a posted content

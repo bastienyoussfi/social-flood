@@ -50,11 +50,15 @@ export class TwitterMediaService {
       const attachment = media[i];
 
       try {
-        this.logger.log(`Uploading media ${i + 1}/${media.length}: ${attachment.url}`);
+        this.logger.log(
+          `Uploading media ${i + 1}/${media.length}: ${attachment.url}`,
+        );
 
         // For now, we only support images
         if (attachment.type !== 'image') {
-          this.logger.warn(`Skipping unsupported media type: ${attachment.type}`);
+          this.logger.warn(
+            `Skipping unsupported media type: ${attachment.type}`,
+          );
           continue;
         }
 
@@ -86,7 +90,9 @@ export class TwitterMediaService {
    * @param attachment - Media attachment with URL
    * @returns Twitter media ID
    */
-  private async uploadSingleImage(attachment: MediaAttachment): Promise<string> {
+  private async uploadSingleImage(
+    attachment: MediaAttachment,
+  ): Promise<string> {
     try {
       // Download image from URL
       const imageBuffer = await this.downloadMedia(attachment.url);
@@ -123,7 +129,10 @@ export class TwitterMediaService {
 
       return mediaId;
     } catch (error) {
-      this.logger.error(`Failed to upload image: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to upload image: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`Image upload failed: ${error.message}`);
     }
   }
@@ -159,7 +168,10 @@ export class TwitterMediaService {
 
       return buffer;
     } catch (error) {
-      this.logger.error(`Failed to download media: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to download media: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`Media download failed: ${error.message}`);
     }
   }
@@ -169,7 +181,10 @@ export class TwitterMediaService {
    * @param media - Array of media attachments
    * @returns Validation result
    */
-  validateMedia(media: MediaAttachment[]): { valid: boolean; errors: string[] } {
+  validateMedia(media: MediaAttachment[]): {
+    valid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     if (!media || media.length === 0) {
@@ -199,7 +214,9 @@ export class TwitterMediaService {
       try {
         new URL(attachment.url);
       } catch {
-        errors.push(`Media item ${index + 1} has invalid URL: ${attachment.url}`);
+        errors.push(
+          `Media item ${index + 1} has invalid URL: ${attachment.url}`,
+        );
       }
     });
 
