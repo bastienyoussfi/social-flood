@@ -1,21 +1,24 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bull';
+import { Job } from 'bull';
 import { LinkedInAdapter } from './linkedin.adapter';
 import { PostContent, PostStatus, Platform } from '../../common/interfaces';
 
+type MockQueue = {
+  add: jest.Mock;
+  getJob: jest.Mock;
+};
+
 describe('LinkedInAdapter', () => {
   let adapter: LinkedInAdapter;
-  let mockQueue: any;
+  let mockQueue: MockQueue;
 
   const mockJob = {
     id: 'test-job-123',
     getState: jest.fn(),
-    returnvalue: null,
-    failedReason: null,
-  };
+    returnvalue: null as any,
+    failedReason: undefined as string | undefined,
+  } as Partial<Job> & { getState: jest.Mock };
 
   beforeEach(async () => {
     mockQueue = {
@@ -172,7 +175,7 @@ describe('LinkedInAdapter', () => {
         platform: Platform.LINKEDIN,
         platformPostId: 'linkedin-123',
         url: 'https://www.linkedin.com/feed/update/urn:li:share:linkedin-123',
-        error: null,
+        error: undefined,
       });
     });
 
