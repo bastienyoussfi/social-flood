@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { LinkedInService } from './linkedin.service';
 import { LinkedInApiClient } from './linkedin-api.client';
@@ -68,8 +67,9 @@ describe('LinkedInService', () => {
     });
 
     it('should check if service is ready', () => {
+      const isConfiguredSpy = jest.spyOn(apiClient, 'isConfigured');
       expect(service.isReady()).toBe(true);
-      expect(apiClient.isConfigured).toHaveBeenCalled();
+      expect(isConfiguredSpy).toHaveBeenCalled();
     });
   });
 
@@ -86,7 +86,8 @@ describe('LinkedInService', () => {
         url: 'https://www.linkedin.com/feed/update/urn:li:share:7890',
       });
 
-      expect(apiClient.createPost).toHaveBeenCalledWith(
+      const createPostSpy = jest.spyOn(apiClient, 'createPost');
+      expect(createPostSpy).toHaveBeenCalledWith(
         'Test LinkedIn post',
         undefined,
       );
@@ -109,9 +110,13 @@ describe('LinkedInService', () => {
 
       const result = await service.publishPost(content);
 
-      expect(mediaService.validateMedia).toHaveBeenCalledWith(content.media);
-      expect(mediaService.uploadMedia).toHaveBeenCalledWith(content.media);
-      expect(apiClient.createPost).toHaveBeenCalledWith(
+      const validateMediaSpy = jest.spyOn(mediaService, 'validateMedia');
+      const uploadMediaSpy = jest.spyOn(mediaService, 'uploadMedia');
+      const createPostSpy = jest.spyOn(apiClient, 'createPost');
+
+      expect(validateMediaSpy).toHaveBeenCalledWith(content.media);
+      expect(uploadMediaSpy).toHaveBeenCalledWith(content.media);
+      expect(createPostSpy).toHaveBeenCalledWith(
         'Test LinkedIn post with images',
         ['urn:li:image:123', 'urn:li:image:456'],
       );
@@ -130,7 +135,8 @@ describe('LinkedInService', () => {
 
       await service.publishPost(content);
 
-      expect(apiClient.createPost).toHaveBeenCalledWith(
+      const createPostSpy = jest.spyOn(apiClient, 'createPost');
+      expect(createPostSpy).toHaveBeenCalledWith(
         'Check out this link\n\nhttps://example.com/article',
         undefined,
       );
