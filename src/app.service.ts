@@ -14,18 +14,56 @@ export class AppService {
   ) {}
 
   async getHealth() {
-    const dbStatus = this.connection.isInitialized
-      ? 'connected'
-      : 'disconnected';
+    const checks = await Promise.allSettled([
+      this.checkDatabase(),
+      this.checkRedis(),
+    ]);
+
+    const [dbResult, redisResult] = checks;
+
+    const dbStatus =
+      dbResult.status === 'fulfilled' && dbResult.value
+        ? 'healthy'
+        : 'unhealthy';
+
+    const redisStatus =
+      redisResult.status === 'fulfilled' && redisResult.value
+        ? 'healthy'
+        : 'unhealthy';
+
+    const isHealthy = dbStatus === 'healthy' && redisStatus === 'healthy';
 
     return {
-      status: 'ok',
+      status: isHealthy ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       services: {
         database: dbStatus,
-        redis: 'connected', // If we can inject queues, Redis is connected
+        redis: redisStatus,
       },
     };
+  }
+
+  private async checkDatabase(): Promise<boolean> {
+    try {
+      if (!this.connection.isInitialized) {
+        return false;
+      }
+
+      await this.connection.query('SELECT 1');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async checkRedis(): Promise<boolean> {
+    try {
+      const client = this.linkedInQueue.client;
+      await client.ping();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async getQueuesStatus() {

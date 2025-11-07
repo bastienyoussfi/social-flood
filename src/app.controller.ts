@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { AppService } from './app.service';
 
 @ApiTags('health')
@@ -10,8 +11,13 @@ export class AppController {
   @Get('health')
   @ApiOperation({ summary: 'Health check endpoint' })
   @ApiResponse({ status: 200, description: 'Service is healthy' })
-  getHealth() {
-    return this.appService.getHealth();
+  @ApiResponse({ status: 503, description: 'Service is degraded' })
+  async getHealth(@Res() res: Response) {
+    const health = await this.appService.getHealth();
+    const statusCode =
+      health.status === 'ok' ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE;
+
+    return res.status(statusCode).json(health);
   }
 
   @Get('api/queues/status')
