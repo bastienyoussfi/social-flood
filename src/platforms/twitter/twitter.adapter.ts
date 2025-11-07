@@ -47,7 +47,7 @@ export class TwitterAdapter implements PlatformAdapter {
     };
   }
 
-  async validateContent(
+  validateContent(
     content: PostContent,
   ): Promise<{ valid: boolean; errors?: string[] }> {
     const errors: string[] = [];
@@ -63,7 +63,9 @@ export class TwitterAdapter implements PlatformAdapter {
     }
 
     if (content.media && content.media.length > this.MAX_IMAGES) {
-      errors.push(`Twitter supports maximum ${this.MAX_IMAGES} images per post`);
+      errors.push(
+        `Twitter supports maximum ${this.MAX_IMAGES} images per post`,
+      );
     }
 
     return {
