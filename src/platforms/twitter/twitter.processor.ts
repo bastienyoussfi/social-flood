@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { PostContent } from '../../common/interfaces';
 import { TwitterService } from './twitter.service';
+import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 @Processor('twitter-posts')
 export class TwitterProcessor {
@@ -19,9 +20,12 @@ export class TwitterProcessor {
       this.logger.log(`Twitter post ${job.id} completed successfully`);
       return result;
     } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      const errorStack = getErrorStack(error);
+
       this.logger.error(
-        `Failed to process Twitter post ${job.id}: ${error.message}`,
-        error.stack,
+        `Failed to process Twitter post ${job.id}: ${errorMessage}`,
+        errorStack,
       );
       throw error;
     }

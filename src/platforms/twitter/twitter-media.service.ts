@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EUploadMimeType } from 'twitter-api-v2';
 import { TwitterApiClient } from './twitter-api.client';
 import { MediaAttachment } from '../../common/interfaces';
+import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 /**
  * Twitter Media Service
@@ -68,9 +69,12 @@ export class TwitterMediaService {
 
         this.logger.log(`Media ${i + 1} uploaded successfully: ${mediaId}`);
       } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        const errorStack = getErrorStack(error);
+
         this.logger.error(
-          `Failed to upload media ${i + 1}: ${error.message}`,
-          error.stack,
+          `Failed to upload media ${i + 1}: ${errorMessage}`,
+          errorStack,
         );
         // Continue with other media items
         // You might want to throw here depending on your requirements
@@ -123,17 +127,18 @@ export class TwitterMediaService {
           this.logger.log(`Alt text added to media ${mediaId}`);
         } catch (error) {
           // Alt text is optional, log but don't fail
-          this.logger.warn(`Failed to add alt text: ${error.message}`);
+          const errorMessage = getErrorMessage(error);
+          this.logger.warn(`Failed to add alt text: ${errorMessage}`);
         }
       }
 
       return mediaId;
     } catch (error) {
-      this.logger.error(
-        `Failed to upload image: ${error.message}`,
-        error.stack,
-      );
-      throw new Error(`Image upload failed: ${error.message}`);
+      const errorMessage = getErrorMessage(error);
+      const errorStack = getErrorStack(error);
+
+      this.logger.error(`Failed to upload image: ${errorMessage}`, errorStack);
+      throw new Error(`Image upload failed: ${errorMessage}`);
     }
   }
 
@@ -168,11 +173,14 @@ export class TwitterMediaService {
 
       return buffer;
     } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      const errorStack = getErrorStack(error);
+
       this.logger.error(
-        `Failed to download media: ${error.message}`,
-        error.stack,
+        `Failed to download media: ${errorMessage}`,
+        errorStack,
       );
-      throw new Error(`Media download failed: ${error.message}`);
+      throw new Error(`Media download failed: ${errorMessage}`);
     }
   }
 
