@@ -20,7 +20,12 @@ export interface PostContent {
   text: string;
   media?: MediaAttachment[];
   link?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors?: string[];
 }
 
 export interface PostResult {
@@ -41,9 +46,7 @@ export interface PlatformAdapter {
   /**
    * Validate content against platform requirements
    */
-  validateContent(
-    content: PostContent,
-  ): Promise<{ valid: boolean; errors?: string[] }>;
+  validateContent(content: PostContent): ValidationResult;
 
   /**
    * Get the status of a posted content

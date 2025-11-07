@@ -7,7 +7,9 @@ import {
   PostResult,
   PostStatus,
   Platform,
+  ValidationResult,
 } from '../../common/interfaces';
+import { parseJobReturnValue } from '../utils/job-result.parser';
 
 @Injectable()
 export class LinkedInAdapter implements PlatformAdapter {
@@ -21,7 +23,7 @@ export class LinkedInAdapter implements PlatformAdapter {
   async post(content: PostContent): Promise<PostResult> {
     this.logger.log('Adding LinkedIn post to queue');
 
-    const validation = await this.validateContent(content);
+    const validation = this.validateContent(content);
     if (!validation.valid) {
       return {
         jobId: '',
@@ -46,9 +48,7 @@ export class LinkedInAdapter implements PlatformAdapter {
     };
   }
 
-  async validateContent(
-    content: PostContent,
-  ): Promise<{ valid: boolean; errors?: string[] }> {
+  validateContent(content: PostContent): ValidationResult {
     const errors: string[] = [];
 
     if (!content.text || content.text.trim().length === 0) {
@@ -93,12 +93,14 @@ export class LinkedInAdapter implements PlatformAdapter {
         status = PostStatus.QUEUED;
     }
 
+    const returnValue = parseJobReturnValue(job.returnvalue);
+
     return {
       jobId,
       status,
       platform: Platform.LINKEDIN,
-      platformPostId: job.returnvalue?.platformPostId,
-      url: job.returnvalue?.url,
+      platformPostId: returnValue?.platformPostId,
+      url: returnValue?.url,
       error: job.failedReason,
     };
   }

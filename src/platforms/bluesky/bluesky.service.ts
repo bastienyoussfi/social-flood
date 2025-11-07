@@ -12,7 +12,7 @@ export class BlueskyService {
     platformPostId: string;
     url: string;
   }> {
-    this.logger.log('Publishing post to Bluesky');
+    this.logger.log(`Publishing post to Bluesky: ${content.text}`);
 
     // TODO: Implement actual Bluesky API integration
     // This is a placeholder implementation

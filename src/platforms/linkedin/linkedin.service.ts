@@ -12,7 +12,7 @@ export class LinkedInService {
     platformPostId: string;
     url: string;
   }> {
-    this.logger.log('Publishing post to LinkedIn');
+    this.logger.log(`Publishing post to LinkedIn: ${content.text}`);
 
     // TODO: Implement actual LinkedIn API integration
     // This is a placeholder implementation

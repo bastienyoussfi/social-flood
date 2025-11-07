@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TwitterApi, EUploadMimeType } from 'twitter-api-v2';
+import { EUploadMimeType } from 'twitter-api-v2';
 import { TwitterApiClient } from './twitter-api.client';
 import { MediaAttachment } from '../../common/interfaces';
 
