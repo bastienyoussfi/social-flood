@@ -10,6 +10,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Platform } from '../../common/interfaces';
 
 export class MediaDto {
   @ApiProperty({
@@ -69,11 +70,11 @@ export class CreatePostDto {
 
   @ApiProperty({
     description: 'Platforms to post to',
-    enum: ['linkedin', 'twitter', 'bluesky'],
+    enum: Platform,
     isArray: true,
-    example: ['linkedin', 'twitter', 'bluesky'],
+    example: [Platform.LINKEDIN, Platform.TWITTER, Platform.BLUESKY],
   })
   @IsArray()
-  @IsEnum(['linkedin', 'twitter', 'bluesky'], { each: true })
-  platforms: string[];
+  @IsEnum(Platform, { each: true })
+  platforms: Platform[];
 }
