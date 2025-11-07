@@ -3,6 +3,7 @@ import { PostContent } from '../../common/interfaces';
 import { TwitterApiClient } from './twitter-api.client';
 import { TwitterMediaService } from './twitter-media.service';
 import { TwitterPostResult } from './interfaces';
+import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 /**
  * Twitter Service
@@ -86,13 +87,13 @@ export class TwitterService {
         url: result.url,
       };
     } catch (error) {
-      this.logger.error(
-        `Failed to publish tweet: ${error.message}`,
-        error.stack,
-      );
+      const errorMessage = getErrorMessage(error);
+      const errorStack = getErrorStack(error);
+
+      this.logger.error(`Failed to publish tweet: ${errorMessage}`, errorStack);
 
       // Re-throw with context
-      throw new Error(`Twitter posting failed: ${error.message}`);
+      throw new Error(`Twitter posting failed: ${errorMessage}`);
     }
   }
 
