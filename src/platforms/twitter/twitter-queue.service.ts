@@ -10,6 +10,18 @@ import {
   PlatformPostStatus,
 } from '../../database/entities';
 
+interface TwitterJobData {
+  metadata?: {
+    postId?: string;
+  };
+  [key: string]: unknown;
+}
+
+interface TwitterJobResult {
+  platformPostId: string;
+  url: string;
+}
+
 /**
  * Twitter Queue Event Handler
  * Listens to queue events and updates database accordingly
@@ -30,13 +42,15 @@ export class TwitterQueueService {
    * Updates the platform_posts table with the result
    */
   @OnQueueCompleted()
-  async onCompleted(job: Job, result: { platformPostId: string; url: string }) {
+  async onCompleted(
+    job: Job<TwitterJobData>,
+    result: TwitterJobResult,
+  ): Promise<void> {
     try {
       this.logger.log(`Job ${job.id} completed. Updating database...`);
 
       // Find the platform post by postId from job metadata
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const postId: string = job.data.metadata?.postId;
+      const postId = job.data.metadata?.postId;
       if (!postId) {
         this.logger.warn(
           `Job ${job.id} completed but no postId found in metadata`,
@@ -85,12 +99,11 @@ export class TwitterQueueService {
    * Updates the platform_posts table with the error
    */
   @OnQueueFailed()
-  async onFailed(job: Job, error: Error) {
+  async onFailed(job: Job<TwitterJobData>, error: Error): Promise<void> {
     try {
       this.logger.error(`Job ${job.id} failed: ${error.message}`, error.stack);
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const postId: string = job.data.metadata?.postId;
+      const postId = job.data.metadata?.postId;
       if (!postId) {
         this.logger.warn(
           `Job ${job.id} failed but no postId found in metadata`,
