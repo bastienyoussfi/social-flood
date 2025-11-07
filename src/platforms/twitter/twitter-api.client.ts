@@ -4,12 +4,14 @@ import {
   TwitterApi,
   TweetV2PostTweetResult,
   ApiResponseError,
+  SendTweetV2Params,
 } from 'twitter-api-v2';
 import {
   TwitterConfig,
   TwitterPostResult,
   TwitterAuthCredentials,
 } from './interfaces';
+import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 /**
  * Twitter API v2 Client
@@ -74,7 +76,8 @@ export class TwitterApiClient {
       this.client = new TwitterApi(credentials);
       this.logger.log('Twitter API client initialized successfully');
     } catch (error) {
-      this.logger.error('Failed to initialize Twitter API client', error.stack);
+      const errorStack = getErrorStack(error);
+      this.logger.error('Failed to initialize Twitter API client', errorStack);
       throw error;
     }
   }
@@ -94,14 +97,41 @@ export class TwitterApiClient {
         `Posting tweet: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
       );
 
-      const tweetData: any = { text };
+      const tweetData: SendTweetV2Params = { text };
 
       // Add media if provided
       if (mediaIds && mediaIds.length > 0) {
+        // Twitter API accepts up to 4 media IDs as specific tuple types
+        const limitedIds = mediaIds.slice(0, 4);
+        let typedMediaIds:
+          | [string]
+          | [string, string]
+          | [string, string, string]
+          | [string, string, string, string];
+
+        switch (limitedIds.length) {
+          case 1:
+            typedMediaIds = [limitedIds[0]];
+            break;
+          case 2:
+            typedMediaIds = [limitedIds[0], limitedIds[1]];
+            break;
+          case 3:
+            typedMediaIds = [limitedIds[0], limitedIds[1], limitedIds[2]];
+            break;
+          default:
+            typedMediaIds = [
+              limitedIds[0],
+              limitedIds[1],
+              limitedIds[2],
+              limitedIds[3],
+            ];
+        }
+
         tweetData.media = {
-          media_ids: mediaIds,
+          media_ids: typedMediaIds,
         };
-        this.logger.log(`Attaching ${mediaIds.length} media item(s)`);
+        this.logger.log(`Attaching ${limitedIds.length} media item(s)`);
       }
 
       // Post the tweet using v2 API
@@ -141,7 +171,7 @@ export class TwitterApiClient {
    * Handle Twitter API errors
    * Provides detailed error messages and logging
    */
-  private handleApiError(error: any): never {
+  private handleApiError(error: unknown): never {
     if (error instanceof ApiResponseError) {
       // Twitter API v2 error
       const errorData = error.data;
@@ -171,10 +201,11 @@ export class TwitterApiClient {
     }
 
     // Generic error
-    this.logger.error('Unexpected error posting to Twitter', error.stack);
-    throw new Error(
-      `Failed to post to Twitter: ${error.message || 'Unknown error'}`,
-    );
+    const errorMessage = getErrorMessage(error);
+    const errorStack = getErrorStack(error);
+
+    this.logger.error('Unexpected error posting to Twitter', errorStack);
+    throw new Error(`Failed to post to Twitter: ${errorMessage}`);
   }
 
   /**

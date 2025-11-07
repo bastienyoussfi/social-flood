@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { PostContent } from '../../common/interfaces';
 import { LinkedInService } from './linkedin.service';
+import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 @Processor('linkedin-posts')
 export class LinkedInProcessor {
@@ -19,9 +20,12 @@ export class LinkedInProcessor {
       this.logger.log(`LinkedIn post ${job.id} completed successfully`);
       return result;
     } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      const errorStack = getErrorStack(error);
+
       this.logger.error(
-        `Failed to process LinkedIn post ${job.id}: ${error.message}`,
-        error.stack,
+        `Failed to process LinkedIn post ${job.id}: ${errorMessage}`,
+        errorStack,
       );
       throw error;
     }

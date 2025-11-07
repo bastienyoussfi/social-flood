@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { PostContent } from '../../common/interfaces';
 import { BlueskyService } from './bluesky.service';
+import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 @Processor('bluesky-posts')
 export class BlueskyProcessor {
@@ -19,9 +20,12 @@ export class BlueskyProcessor {
       this.logger.log(`Bluesky post ${job.id} completed successfully`);
       return result;
     } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      const errorStack = getErrorStack(error);
+
       this.logger.error(
-        `Failed to process Bluesky post ${job.id}: ${error.message}`,
-        error.stack,
+        `Failed to process Bluesky post ${job.id}: ${errorMessage}`,
+        errorStack,
       );
       throw error;
     }
