@@ -1,8 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { LinkedInApiClient } from './linkedin-api.client';
@@ -12,11 +7,19 @@ import {
   LinkedInLifecycleState,
 } from './interfaces';
 
+type MockConfig = {
+  LINKEDIN_CLIENT_ID: string;
+  LINKEDIN_CLIENT_SECRET: string;
+  LINKEDIN_ACCESS_TOKEN: string;
+  LINKEDIN_PERSON_URN: string;
+  [key: string]: string | undefined;
+};
+
 describe('LinkedInApiClient', () => {
   let client: LinkedInApiClient;
   let configService: ConfigService;
 
-  const mockConfig = {
+  const mockConfig: MockConfig = {
     LINKEDIN_CLIENT_ID: 'test-client-id',
     LINKEDIN_CLIENT_SECRET: 'test-client-secret',
     LINKEDIN_ACCESS_TOKEN: 'test-access-token',
@@ -50,15 +53,16 @@ describe('LinkedInApiClient', () => {
     });
 
     it('should load configuration from environment', () => {
-      expect(configService.get).toHaveBeenCalledWith('LINKEDIN_CLIENT_ID');
-      expect(configService.get).toHaveBeenCalledWith('LINKEDIN_CLIENT_SECRET');
-      expect(configService.get).toHaveBeenCalledWith('LINKEDIN_ACCESS_TOKEN');
-      expect(configService.get).toHaveBeenCalledWith('LINKEDIN_PERSON_URN');
+      const getSpy = jest.spyOn(configService, 'get');
+      expect(getSpy).toHaveBeenCalledWith('LINKEDIN_CLIENT_ID');
+      expect(getSpy).toHaveBeenCalledWith('LINKEDIN_CLIENT_SECRET');
+      expect(getSpy).toHaveBeenCalledWith('LINKEDIN_ACCESS_TOKEN');
+      expect(getSpy).toHaveBeenCalledWith('LINKEDIN_PERSON_URN');
     });
 
     it('should throw error if client credentials are missing', () => {
       const invalidConfigService = {
-        get: jest.fn((key: string) => {
+        get: jest.fn((key: string): string | undefined => {
           if (key === 'LINKEDIN_CLIENT_ID') return '';
           return mockConfig[key];
         }),
@@ -75,21 +79,33 @@ describe('LinkedInApiClient', () => {
   });
 
   describe('createPost', () => {
-    const mockPostResponse = {
+    type MockResponse = {
       headers: {
-        get: jest.fn((header: string) => {
+        get: (header: string) => string | null;
+      };
+      ok: boolean;
+      status?: number;
+      json: () => Promise<unknown>;
+    };
+
+    const mockPostResponse: MockResponse = {
+      headers: {
+        get: (header: string): string | null => {
           if (header === 'x-restli-id') {
             return 'urn:li:share:7890';
           }
           return null;
-        }),
+        },
       },
       ok: true,
       json: jest.fn().mockResolvedValue({}),
     };
 
+    let fetchMock: jest.Mock;
+
     beforeEach(() => {
-      global.fetch = jest.fn().mockResolvedValue(mockPostResponse);
+      fetchMock = jest.fn().mockResolvedValue(mockPostResponse);
+      global.fetch = fetchMock as unknown as typeof fetch;
     });
 
     it('should create a post successfully', async () => {
@@ -101,25 +117,33 @@ describe('LinkedInApiClient', () => {
         urn: 'urn:li:share:7890',
       });
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchMock).toHaveBeenCalledWith(
         'https://api.linkedin.com/rest/posts',
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
-            Authorization: 'Bearer test-access-token',
-            'LinkedIn-Version': '202510',
-            'X-Restli-Protocol-Version': '2.0.0',
-            'Content-Type': 'application/json',
-          }),
         }),
       );
+
+      const callArgs = fetchMock.mock.calls[0] as [
+        string,
+        { headers: Record<string, string>; [key: string]: unknown },
+      ];
+      expect(callArgs[1].headers).toMatchObject({
+        Authorization: 'Bearer test-access-token',
+        'LinkedIn-Version': '202510',
+        'X-Restli-Protocol-Version': '2.0.0',
+        'Content-Type': 'application/json',
+      });
     });
 
     it('should create a post with single media', async () => {
       await client.createPost('Test post', ['urn:li:image:123']);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = fetchMock.mock.calls[0] as [
+        string,
+        { body: string; [key: string]: unknown },
+      ];
+      const body = JSON.parse(callArgs[1].body) as Record<string, unknown>;
 
       expect(body).toMatchObject({
         author: 'urn:li:person:123456',
@@ -143,8 +167,13 @@ describe('LinkedInApiClient', () => {
         'urn:li:image:456',
       ]);
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = fetchMock.mock.calls[0] as [
+        string,
+        { body: string; [key: string]: unknown },
+      ];
+      const body = JSON.parse(callArgs[1].body) as {
+        content: Record<string, unknown>;
+      };
 
       expect(body.content).toMatchObject({
         multiImage: {
@@ -155,7 +184,7 @@ describe('LinkedInApiClient', () => {
 
     it('should throw error if access token is missing', async () => {
       const noTokenConfigService = {
-        get: jest.fn((key: string) => {
+        get: jest.fn((key: string): string | undefined => {
           if (key === 'LINKEDIN_ACCESS_TOKEN') return undefined;
           return mockConfig[key];
         }),
@@ -172,7 +201,7 @@ describe('LinkedInApiClient', () => {
 
     it('should throw error if person URN is missing', async () => {
       const noUrnConfigService = {
-        get: jest.fn((key: string) => {
+        get: jest.fn((key: string): string | undefined => {
           if (key === 'LINKEDIN_PERSON_URN') return undefined;
           return mockConfig[key];
         }),
@@ -188,16 +217,19 @@ describe('LinkedInApiClient', () => {
     });
 
     it('should handle API errors', async () => {
-      const errorResponse = {
+      const errorResponse: MockResponse = {
         ok: false,
         status: 400,
+        headers: {
+          get: (): null => null,
+        },
         json: jest.fn().mockResolvedValue({
           status: 400,
           message: 'Invalid request',
         }),
       };
 
-      global.fetch = jest.fn().mockResolvedValue(errorResponse);
+      fetchMock.mockResolvedValue(errorResponse);
 
       await expect(client.createPost('Test')).rejects.toThrow(
         'LinkedIn API validation error',
@@ -205,16 +237,19 @@ describe('LinkedInApiClient', () => {
     });
 
     it('should handle rate limit errors', async () => {
-      const errorResponse = {
+      const errorResponse: MockResponse = {
         ok: false,
         status: 429,
+        headers: {
+          get: (): null => null,
+        },
         json: jest.fn().mockResolvedValue({
           status: 429,
           message: 'Rate limit exceeded',
         }),
       };
 
-      global.fetch = jest.fn().mockResolvedValue(errorResponse);
+      fetchMock.mockResolvedValue(errorResponse);
 
       await expect(client.createPost('Test')).rejects.toThrow(
         'LinkedIn rate limit exceeded',
@@ -222,16 +257,19 @@ describe('LinkedInApiClient', () => {
     });
 
     it('should handle authentication errors', async () => {
-      const errorResponse = {
+      const errorResponse: MockResponse = {
         ok: false,
         status: 401,
+        headers: {
+          get: (): null => null,
+        },
         json: jest.fn().mockResolvedValue({
           status: 401,
           message: 'Unauthorized',
         }),
       };
 
-      global.fetch = jest.fn().mockResolvedValue(errorResponse);
+      fetchMock.mockResolvedValue(errorResponse);
 
       await expect(client.createPost('Test')).rejects.toThrow(
         'LinkedIn authentication failed',
