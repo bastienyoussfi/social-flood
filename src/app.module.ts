@@ -8,6 +8,7 @@ import { PostsModule } from './posts/posts.module';
 import { LinkedInModule } from './platforms/linkedin/linkedin.module';
 import { TwitterModule } from './platforms/twitter/twitter.module';
 import { BlueskyModule } from './platforms/bluesky/bluesky.module';
+import { TikTokModule } from './platforms/tiktok/tiktok.module';
 import { getDatabaseConfig } from './config/database.config';
 import { getRedisConfig } from './config/redis.config';
 
@@ -40,12 +41,14 @@ import { getRedisConfig } from './config/redis.config';
       { name: 'linkedin-posts' },
       { name: 'twitter-posts' },
       { name: 'bluesky-posts' },
+      { name: 'tiktok-posts' },
     ),
 
     // Platform modules
     LinkedInModule,
     TwitterModule,
     BlueskyModule,
+    TikTokModule,
 
     // Business logic modules
     PostsModule,
