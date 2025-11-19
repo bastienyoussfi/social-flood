@@ -9,6 +9,7 @@ import { LinkedInModule } from './platforms/linkedin/linkedin.module';
 import { TwitterModule } from './platforms/twitter/twitter.module';
 import { BlueskyModule } from './platforms/bluesky/bluesky.module';
 import { TikTokModule } from './platforms/tiktok/tiktok.module';
+import { YoutubeModule } from './platforms/youtube/youtube.module';
 import { getDatabaseConfig } from './config/database.config';
 import { getRedisConfig } from './config/redis.config';
 
@@ -42,6 +43,7 @@ import { getRedisConfig } from './config/redis.config';
       { name: 'twitter-posts' },
       { name: 'bluesky-posts' },
       { name: 'tiktok-posts' },
+      { name: 'youtube-posts' },
     ),
 
     // Platform modules
@@ -49,6 +51,7 @@ import { getRedisConfig } from './config/redis.config';
     TwitterModule,
     BlueskyModule,
     TikTokModule,
+    YoutubeModule,
 
     // Business logic modules
     PostsModule,

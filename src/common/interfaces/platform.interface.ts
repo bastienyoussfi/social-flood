@@ -9,6 +9,7 @@ export enum Platform {
   TWITTER = 'twitter',
   BLUESKY = 'bluesky',
   TIKTOK = 'tiktok',
+  YOUTUBE = 'youtube',
 }
 
 export interface MediaAttachment {
