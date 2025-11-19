@@ -8,6 +8,7 @@ export enum Platform {
   LINKEDIN = 'linkedin',
   TWITTER = 'twitter',
   BLUESKY = 'bluesky',
+  REDDIT = 'reddit',
 }
 
 export interface MediaAttachment {

@@ -77,4 +77,23 @@ export class CreatePostDto {
   @IsArray()
   @IsEnum(Platform, { each: true })
   platforms: Platform[];
+
+  @ApiProperty({
+    description: 'Post title (required for Reddit posts)',
+    required: false,
+    example: 'Check out this amazing discovery!',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  title?: string;
+
+  @ApiProperty({
+    description: 'Subreddit to post to (required for Reddit posts, without /r/)',
+    required: false,
+    example: 'technology',
+  })
+  @IsOptional()
+  @IsString()
+  subreddit?: string;
 }

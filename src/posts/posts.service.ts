@@ -6,6 +6,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { LinkedInAdapter } from '../platforms/linkedin/linkedin.adapter';
 import { TwitterAdapter } from '../platforms/twitter/twitter.adapter';
 import { BlueskyAdapter } from '../platforms/bluesky/bluesky.adapter';
+import { RedditAdapter } from '../platforms/reddit/reddit.adapter';
 import {
   PostContent,
   Platform,
@@ -28,12 +29,14 @@ export class PostsService {
     private readonly linkedInAdapter: LinkedInAdapter,
     private readonly twitterAdapter: TwitterAdapter,
     private readonly blueskyAdapter: BlueskyAdapter,
+    private readonly redditAdapter: RedditAdapter,
   ) {
     // Initialize adapter registry
     this.platformAdapters = new Map<Platform, PlatformAdapter>([
       [Platform.LINKEDIN, this.linkedInAdapter],
       [Platform.TWITTER, this.twitterAdapter],
       [Platform.BLUESKY, this.blueskyAdapter],
+      [Platform.REDDIT, this.redditAdapter],
     ]);
   }
 
@@ -53,7 +56,12 @@ export class PostsService {
       text: createPostDto.text,
       media: createPostDto.media,
       link: createPostDto.link,
-      metadata: { postId: post.id },
+      metadata: {
+        postId: post.id,
+        // Include Reddit-specific fields if provided
+        ...(createPostDto.title && { title: createPostDto.title }),
+        ...(createPostDto.subreddit && { subreddit: createPostDto.subreddit }),
+      },
     };
 
     // Post to each platform

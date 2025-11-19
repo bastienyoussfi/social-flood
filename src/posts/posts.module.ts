@@ -6,6 +6,7 @@ import { Post, PlatformPost } from '../database/entities';
 import { LinkedInModule } from '../platforms/linkedin/linkedin.module';
 import { TwitterModule } from '../platforms/twitter/twitter.module';
 import { BlueskyModule } from '../platforms/bluesky/bluesky.module';
+import { RedditModule } from '../platforms/reddit/reddit.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { BlueskyModule } from '../platforms/bluesky/bluesky.module';
     LinkedInModule,
     TwitterModule,
     BlueskyModule,
+    RedditModule,
   ],
   controllers: [PostsController],
   providers: [PostsService],
