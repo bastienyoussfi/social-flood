@@ -7,7 +7,7 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { PinterestOAuthService } from './pinterest-oauth.service';
 import { getErrorMessage } from '../../common/utils/error.utils';
 
@@ -35,10 +35,7 @@ export class PinterestOAuthController {
    * Example: GET /auth/pinterest/login?userId=user@example.com
    */
   @Get('login')
-  async login(
-    @Query('userId') userId: string,
-    @Res() res: Response,
-  ): Promise<void> {
+  login(@Query('userId') userId: string, @Res() res: Response) {
     try {
       if (!userId) {
         throw new BadRequestException(
@@ -89,7 +86,7 @@ export class PinterestOAuthController {
       // Check for OAuth errors
       if (error) {
         this.logger.error(`OAuth error: ${error} - ${errorDescription}`);
-        return res.status(HttpStatus.BAD_REQUEST).json({
+        res.status(HttpStatus.BAD_REQUEST).json({
           error: 'OAuth authorization failed',
           message: errorDescription || error,
         });
@@ -119,9 +116,7 @@ export class PinterestOAuthController {
         userId,
       );
 
-      this.logger.log(
-        `Successfully authorized Pinterest for user: ${userId}`,
-      );
+      this.logger.log(`Successfully authorized Pinterest for user: ${userId}`);
 
       // Success response
       res.status(HttpStatus.OK).json({

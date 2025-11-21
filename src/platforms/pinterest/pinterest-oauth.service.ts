@@ -3,11 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OAuthToken } from '../../database/entities/oauth-token.entity';
-import {
-  PinterestConfig,
-  PinterestAuthToken,
-  PINTEREST_API_BASE_URL,
-} from './interfaces';
+import { PinterestConfig, PinterestAuthToken } from './interfaces';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 /**
@@ -54,14 +50,11 @@ export class PinterestOAuthService {
     const appId = this.configService.get<string>('PINTEREST_APP_ID') || '';
     const appSecret =
       this.configService.get<string>('PINTEREST_APP_SECRET') || '';
-    const accessToken =
-      this.configService.get<string>('PINTEREST_ACCESS_TOKEN') || '';
     const boardId = this.configService.get<string>('PINTEREST_BOARD_ID');
 
     return {
       appId,
       appSecret,
-      accessToken,
       boardId,
     };
   }
@@ -121,7 +114,9 @@ export class PinterestOAuthService {
       // Save token to database
       const oauthToken = await this.saveToken(userId, tokenResponse);
 
-      this.logger.log(`Successfully obtained and saved token for user ${userId}`);
+      this.logger.log(
+        `Successfully obtained and saved token for user ${userId}`,
+      );
       return oauthToken;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -168,7 +163,8 @@ export class PinterestOAuthService {
       );
     }
 
-    const tokenData: PinterestAuthToken = await response.json();
+    const tokenData: PinterestAuthToken =
+      (await response.json()) as PinterestAuthToken;
     return tokenData;
   }
 
@@ -215,10 +211,13 @@ export class PinterestOAuthService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Token refresh failed: ${response.status} ${errorText}`);
+        throw new Error(
+          `Token refresh failed: ${response.status} ${errorText}`,
+        );
       }
 
-      const tokenData: PinterestAuthToken = await response.json();
+      const tokenData: PinterestAuthToken =
+        (await response.json()) as PinterestAuthToken;
 
       // Update token in database
       const updatedToken = await this.saveToken(userId, tokenData);
@@ -229,10 +228,7 @@ export class PinterestOAuthService {
       const errorMessage = getErrorMessage(error);
       const errorStack = getErrorStack(error);
 
-      this.logger.error(
-        `Failed to refresh token: ${errorMessage}`,
-        errorStack,
-      );
+      this.logger.error(`Failed to refresh token: ${errorMessage}`, errorStack);
       throw new Error(`Token refresh failed: ${errorMessage}`);
     }
   }
@@ -261,7 +257,8 @@ export class PinterestOAuthService {
     if (oauthToken) {
       // Update existing token
       oauthToken.accessToken = tokenData.access_token;
-      oauthToken.refreshToken = tokenData.refresh_token || oauthToken.refreshToken;
+      oauthToken.refreshToken =
+        tokenData.refresh_token || oauthToken.refreshToken;
       oauthToken.expiresAt = expiresAt;
       oauthToken.scopes = scopes;
       oauthToken.isActive = true;
@@ -379,8 +376,14 @@ export class PinterestOAuthService {
 
       return { userId, timestamp: parseInt(timestamp, 10) };
     } catch (error) {
-      this.logger.error('Failed to validate state parameter');
-      return null;
+      const errorMessage = getErrorMessage(error);
+      const errorStack = getErrorStack(error);
+
+      this.logger.error(
+        `Failed to validate state parameter: ${errorMessage}`,
+        errorStack,
+      );
+      throw new Error(`Failed to validate state parameter: ${errorMessage}`);
     }
   }
 }

@@ -4,7 +4,6 @@
 export interface PinterestConfig {
   appId: string;
   appSecret?: string;
-  accessToken?: string;
   boardId?: string; // Default board ID for pins
 }
 

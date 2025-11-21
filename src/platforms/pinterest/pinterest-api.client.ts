@@ -37,13 +37,11 @@ export class PinterestApiClient {
   private loadConfig(): PinterestConfig {
     const appId = this.configService.get<string>('PINTEREST_APP_ID') || '';
     const appSecret = this.configService.get<string>('PINTEREST_APP_SECRET');
-    const accessToken = this.configService.get<string>('PINTEREST_ACCESS_TOKEN');
     const boardId = this.configService.get<string>('PINTEREST_BOARD_ID');
 
     return {
       appId,
       appSecret,
-      accessToken,
       boardId,
     };
   }
@@ -55,12 +53,6 @@ export class PinterestApiClient {
     if (!this.config.appId) {
       this.logger.warn(
         'PINTEREST_APP_ID is not set. This may be required for some API operations.',
-      );
-    }
-
-    if (!this.config.accessToken) {
-      this.logger.warn(
-        'PINTEREST_ACCESS_TOKEN is not set. You will need to implement OAuth 2.0 flow to obtain an access token.',
       );
     }
 
@@ -143,7 +135,8 @@ export class PinterestApiClient {
         await this.handleApiError(response);
       }
 
-      const pinData: PinterestPinResponse = await response.json();
+      const pinData: PinterestPinResponse =
+        (await response.json()) as PinterestPinResponse;
 
       if (!pinData.id) {
         throw new Error('Pinterest API returned no pin ID');
@@ -173,13 +166,9 @@ export class PinterestApiClient {
         this.logger.log(`Using OAuth token for user: ${userId}`);
         return oauthToken;
       }
-      this.logger.warn(`No OAuth token found for user: ${userId}, falling back to env variable`);
-    }
-
-    // Fallback to environment variable
-    if (this.config.accessToken) {
-      this.logger.log('Using access token from environment variable');
-      return this.config.accessToken;
+      this.logger.warn(
+        `No OAuth token found for user: ${userId}, falling back to env variable`,
+      );
     }
 
     return null;
@@ -262,18 +251,7 @@ export class PinterestApiClient {
    * Check if the client is properly configured
    */
   isConfigured(): boolean {
-    return !!(
-      this.config.appId &&
-      this.config.accessToken &&
-      this.config.boardId
-    );
-  }
-
-  /**
-   * Get access token for media service
-   */
-  getAccessToken(): string {
-    return this.config.accessToken;
+    return !!(this.config.appId && this.config.boardId);
   }
 
   /**
