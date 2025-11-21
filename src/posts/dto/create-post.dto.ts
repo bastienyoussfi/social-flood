@@ -72,9 +72,23 @@ export class CreatePostDto {
     description: 'Platforms to post to',
     enum: Platform,
     isArray: true,
-    example: [Platform.LINKEDIN, Platform.TWITTER, Platform.BLUESKY],
+    example: [
+      Platform.LINKEDIN,
+      Platform.TWITTER,
+      Platform.BLUESKY,
+      Platform.TIKTOK,
+    ],
   })
   @IsArray()
   @IsEnum(Platform, { each: true })
   platforms: Platform[];
+
+  @ApiProperty({
+    description: 'TikTok user ID (required when posting to TikTok with OAuth)',
+    required: false,
+    example: '7234567890123456789',
+  })
+  @IsOptional()
+  @IsString()
+  tiktokUserId?: string;
 }

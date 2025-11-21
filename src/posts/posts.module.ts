@@ -17,6 +17,7 @@ import { PinterestModule } from '../platforms/pinterest/pinterest.module';
     BlueskyModule,
     TikTokModule,
     PinterestModule,
+    TikTokModule,
   ],
   controllers: [PostsController],
   providers: [PostsService],

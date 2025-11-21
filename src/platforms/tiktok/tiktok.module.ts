@@ -8,7 +8,8 @@ import { TikTokProcessor } from './tiktok.processor';
 import { TikTokApiClient } from './tiktok-api.client';
 import { TikTokMediaService } from './tiktok-media.service';
 import { TikTokQueueService } from './tiktok-queue.service';
-import { PlatformPost, Post } from '../../database/entities';
+import { PlatformPost, Post, TikTokAuth } from '../../database/entities';
+import { AuthModule } from '../../auth/auth.module';
 
 /**
  * TikTok Module
@@ -25,10 +26,11 @@ import { PlatformPost, Post } from '../../database/entities';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([PlatformPost, Post]),
+    TypeOrmModule.forFeature([PlatformPost, Post, TikTokAuth]),
     BullModule.registerQueue({
       name: 'tiktok-posts',
     }),
+    AuthModule,
   ],
   providers: [
     TikTokApiClient,

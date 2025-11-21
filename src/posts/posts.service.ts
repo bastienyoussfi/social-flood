@@ -59,7 +59,12 @@ export class PostsService {
       text: createPostDto.text,
       media: createPostDto.media,
       link: createPostDto.link,
-      metadata: { postId: post.id },
+      metadata: {
+        postId: post.id,
+        ...(createPostDto.tiktokUserId && {
+          tiktokUserId: createPostDto.tiktokUserId,
+        }),
+      },
     };
 
     // Post to each platform

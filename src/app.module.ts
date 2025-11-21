@@ -5,6 +5,7 @@ import { BullModule } from '@nestjs/bull';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PostsModule } from './posts/posts.module';
+import { AuthModule } from './auth/auth.module';
 import { LinkedInModule } from './platforms/linkedin/linkedin.module';
 import { TwitterModule } from './platforms/twitter/twitter.module';
 import { BlueskyModule } from './platforms/bluesky/bluesky.module';
@@ -45,6 +46,9 @@ import { getRedisConfig } from './config/redis.config';
       { name: 'tiktok-posts' },
       { name: 'pinterest-posts' },
     ),
+
+    // Authentication
+    AuthModule,
 
     // Platform modules
     LinkedInModule,
