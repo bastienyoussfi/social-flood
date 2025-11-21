@@ -15,16 +15,16 @@ export class TikTokAuth {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'tiktok_user_id', unique: true })
+  @Column({ name: 'tiktok_user_id', type: 'varchar', unique: true })
   tiktokUserId: string;
 
-  @Column({ name: 'tiktok_username', nullable: true })
+  @Column({ name: 'tiktok_username', type: 'varchar', nullable: true })
   tiktokUsername: string | null;
 
-  @Column({ name: 'access_token' })
+  @Column({ name: 'access_token', type: 'text' })
   accessToken: string;
 
-  @Column({ name: 'refresh_token' })
+  @Column({ name: 'refresh_token', type: 'text' })
   refreshToken: string;
 
   @Column({ name: 'expires_at', type: 'timestamp' })
