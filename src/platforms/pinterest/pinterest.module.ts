@@ -8,7 +8,9 @@ import { PinterestProcessor } from './pinterest.processor';
 import { PinterestApiClient } from './pinterest-api.client';
 import { PinterestMediaService } from './pinterest-media.service';
 import { PinterestQueueService } from './pinterest-queue.service';
-import { PlatformPost, Post } from '../../database/entities';
+import { PinterestOAuthService } from './pinterest-oauth.service';
+import { PinterestOAuthController } from './pinterest-oauth.controller';
+import { PlatformPost, Post, OAuthToken } from '../../database/entities';
 
 /**
  * Pinterest Module
@@ -21,15 +23,18 @@ import { PlatformPost, Post } from '../../database/entities';
  * - PinterestApiClient: Handles Pinterest API v5 communication
  * - PinterestMediaService: Handles media validation
  * - PinterestQueueService: Handles queue events and database updates
+ * - PinterestOAuthService: Handles OAuth 2.0 authentication and token management
+ * - PinterestOAuthController: OAuth endpoints for user authorization
  */
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([PlatformPost, Post]),
+    TypeOrmModule.forFeature([PlatformPost, Post, OAuthToken]),
     BullModule.registerQueue({
       name: 'pinterest-posts',
     }),
   ],
+  controllers: [PinterestOAuthController],
   providers: [
     PinterestApiClient,
     PinterestMediaService,
@@ -37,7 +42,8 @@ import { PlatformPost, Post } from '../../database/entities';
     PinterestAdapter,
     PinterestProcessor,
     PinterestQueueService,
+    PinterestOAuthService,
   ],
-  exports: [PinterestAdapter, PinterestService],
+  exports: [PinterestAdapter, PinterestService, PinterestOAuthService],
 })
 export class PinterestModule {}

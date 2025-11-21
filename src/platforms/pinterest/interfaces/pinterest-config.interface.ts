@@ -3,7 +3,8 @@
  */
 export interface PinterestConfig {
   appId: string;
-  accessToken: string;
+  appSecret?: string;
+  accessToken?: string;
   boardId?: string; // Default board ID for pins
 }
 

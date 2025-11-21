@@ -74,6 +74,9 @@ export class PinterestService {
       const title = lines[0].substring(0, 100); // Pinterest max 100 chars for title
       const description = content.text.substring(0, 500); // Pinterest max 500 chars for description
 
+      // Extract userId from metadata (for OAuth token lookup)
+      const userId = content.metadata?.userId as string | undefined;
+
       // Step 3: Create pin with title, description, and image
       // Use content.link if provided, otherwise no link
       const result: PinterestPostResult = await this.apiClient.createPin(
@@ -81,6 +84,8 @@ export class PinterestService {
         description,
         imageUrl,
         content.link,
+        undefined, // boardId (use default)
+        userId, // userId for OAuth token lookup
       );
 
       this.logger.log(

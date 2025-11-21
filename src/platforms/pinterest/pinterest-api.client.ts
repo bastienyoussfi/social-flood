@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   PinterestConfig,
@@ -9,11 +9,12 @@ import {
   PINTEREST_API_BASE_URL,
 } from './interfaces';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
+import { PinterestOAuthService } from './pinterest-oauth.service';
 
 /**
  * Pinterest API Client
  * Handles all direct communication with Pinterest API v5
- * Uses OAuth 2.0 for authentication
+ * Supports both OAuth 2.0 tokens from database and legacy env variable tokens
  */
 @Injectable()
 export class PinterestApiClient {
@@ -21,7 +22,11 @@ export class PinterestApiClient {
   private readonly config: PinterestConfig;
   private readonly baseUrl = PINTEREST_API_BASE_URL;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject(forwardRef(() => PinterestOAuthService))
+    private readonly oauthService: PinterestOAuthService,
+  ) {
     this.config = this.loadConfig();
     this.validateConfig();
   }
@@ -31,12 +36,13 @@ export class PinterestApiClient {
    */
   private loadConfig(): PinterestConfig {
     const appId = this.configService.get<string>('PINTEREST_APP_ID') || '';
-    const accessToken =
-      this.configService.get<string>('PINTEREST_ACCESS_TOKEN') || '';
+    const appSecret = this.configService.get<string>('PINTEREST_APP_SECRET');
+    const accessToken = this.configService.get<string>('PINTEREST_ACCESS_TOKEN');
     const boardId = this.configService.get<string>('PINTEREST_BOARD_ID');
 
     return {
       appId,
+      appSecret,
       accessToken,
       boardId,
     };
@@ -74,6 +80,7 @@ export class PinterestApiClient {
    * @param imageUrl - URL of the image to pin
    * @param link - Optional link URL
    * @param boardId - Board ID (uses default if not provided)
+   * @param userId - User ID for OAuth token (optional, uses env token if not provided)
    * @returns Pin ID and URL
    */
   async createPin(
@@ -82,15 +89,18 @@ export class PinterestApiClient {
     imageUrl: string,
     link?: string,
     boardId?: string,
+    userId?: string,
   ): Promise<PinterestPostResult> {
     try {
       this.logger.log(
         `Creating Pinterest pin: "${title.substring(0, 50)}${title.length > 50 ? '...' : ''}"`,
       );
 
-      if (!this.config.accessToken) {
+      // Get access token (OAuth or environment variable)
+      const accessToken = await this.getAccessTokenForUser(userId);
+      if (!accessToken) {
         throw new Error(
-          'Pinterest access token is not configured. Please set PINTEREST_ACCESS_TOKEN.',
+          'Pinterest access token is not available. Please connect Pinterest account via OAuth or set PINTEREST_ACCESS_TOKEN.',
         );
       }
 
@@ -124,7 +134,7 @@ export class PinterestApiClient {
       // Make API request
       const response = await fetch(`${this.baseUrl}/pins`, {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: this.getHeaders(accessToken),
         body: JSON.stringify(pinRequest),
       });
 
@@ -153,11 +163,34 @@ export class PinterestApiClient {
   }
 
   /**
+   * Get access token for user (OAuth or fallback to env variable)
+   */
+  private async getAccessTokenForUser(userId?: string): Promise<string | null> {
+    // If userId provided, try to get OAuth token
+    if (userId) {
+      const oauthToken = await this.oauthService.getAccessToken(userId);
+      if (oauthToken) {
+        this.logger.log(`Using OAuth token for user: ${userId}`);
+        return oauthToken;
+      }
+      this.logger.warn(`No OAuth token found for user: ${userId}, falling back to env variable`);
+    }
+
+    // Fallback to environment variable
+    if (this.config.accessToken) {
+      this.logger.log('Using access token from environment variable');
+      return this.config.accessToken;
+    }
+
+    return null;
+  }
+
+  /**
    * Get standard headers for Pinterest API requests
    */
-  private getHeaders(): Record<string, string> {
+  private getHeaders(accessToken: string): Record<string, string> {
     return {
-      Authorization: `Bearer ${this.config.accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     };
   }
