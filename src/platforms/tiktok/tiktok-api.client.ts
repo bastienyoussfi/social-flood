@@ -70,12 +70,17 @@ export class TikTokApiClient {
   /**
    * Get creator information including max video duration
    * GET /v2/post/publish/creator_info/query/
+   * @param accessToken - Optional access token (defaults to config)
    */
-  async getCreatorInfo(): Promise<TikTokCreatorInfoResponse> {
+  async getCreatorInfo(
+    accessToken?: string,
+  ): Promise<TikTokCreatorInfoResponse> {
     try {
       this.logger.log('Fetching TikTok creator info');
 
-      if (!this.config.accessToken) {
+      const token = accessToken || this.config.accessToken;
+
+      if (!token) {
         throw new Error('TikTok access token is not configured');
       }
 
@@ -83,7 +88,7 @@ export class TikTokApiClient {
         `${this.config.apiBaseUrl}/${TIKTOK_API_VERSION}/post/publish/creator_info/query/`,
         {
           method: 'POST',
-          headers: this.getHeaders(),
+          headers: this.getHeaders(token),
           body: JSON.stringify({}),
         },
       );
@@ -111,14 +116,19 @@ export class TikTokApiClient {
   /**
    * Initialize direct post video upload
    * POST /v2/post/publish/video/init/
+   * @param request - Init request
+   * @param accessToken - Optional access token (defaults to config)
    */
   async initializeDirectPost(
     request: TikTokDirectPostInitRequest,
+    accessToken?: string,
   ): Promise<TikTokDirectPostInitResponse> {
     try {
       this.logger.log('Initializing TikTok direct post upload');
 
-      if (!this.config.accessToken) {
+      const token = accessToken || this.config.accessToken;
+
+      if (!token) {
         throw new Error('TikTok access token is not configured');
       }
 
@@ -126,7 +136,7 @@ export class TikTokApiClient {
         `${this.config.apiBaseUrl}/${TIKTOK_API_VERSION}/post/publish/video/init/`,
         {
           method: 'POST',
-          headers: this.getHeaders(),
+          headers: this.getHeaders(token),
           body: JSON.stringify(request),
         },
       );
@@ -195,12 +205,17 @@ export class TikTokApiClient {
   /**
    * Check publish status
    * POST /v2/post/publish/status/fetch/
+   * @param publishId - Publish ID
+   * @param accessToken - Optional access token (defaults to config)
    */
   async getPublishStatus(
     publishId: string,
+    accessToken?: string,
   ): Promise<TikTokPublishStatusResponse> {
     try {
-      if (!this.config.accessToken) {
+      const token = accessToken || this.config.accessToken;
+
+      if (!token) {
         throw new Error('TikTok access token is not configured');
       }
 
@@ -212,7 +227,7 @@ export class TikTokApiClient {
         `${this.config.apiBaseUrl}/${TIKTOK_API_VERSION}/post/publish/status/fetch/`,
         {
           method: 'POST',
-          headers: this.getHeaders(),
+          headers: this.getHeaders(token),
           body: JSON.stringify(requestBody),
         },
       );
@@ -279,10 +294,12 @@ export class TikTokApiClient {
 
   /**
    * Get standard headers for TikTok API requests
+   * @param accessToken - Optional access token (defaults to config)
    */
-  private getHeaders(): Record<string, string> {
+  private getHeaders(accessToken?: string): Record<string, string> {
+    const token = accessToken || this.config.accessToken;
     return {
-      Authorization: `Bearer ${this.config.accessToken}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
   }
