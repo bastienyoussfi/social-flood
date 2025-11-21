@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PostContent } from '../../common/interfaces';
 import { TikTokApiClient } from './tiktok-api.client';
 import { TikTokMediaService } from './tiktok-media.service';
+import { TikTokAuthService } from '../../auth/tiktok-auth.service';
 import {
   TikTokDirectPostInitRequest,
   TikTokPublishStatusResponse,
@@ -24,6 +25,7 @@ export class TikTokService {
   constructor(
     private readonly apiClient: TikTokApiClient,
     private readonly mediaService: TikTokMediaService,
+    private readonly authService: TikTokAuthService,
   ) {}
 
   /**
@@ -39,11 +41,26 @@ export class TikTokService {
     try {
       this.logger.log('Starting TikTok video publication');
 
-      // Validate configuration
-      if (!this.apiClient.isConfigured()) {
-        throw new Error(
-          'TikTok API is not properly configured. Please check your credentials.',
-        );
+      // Get TikTok user ID from metadata
+      const tiktokUserId = content.metadata?.tiktokUserId as string | undefined;
+
+      // Get access token (from user auth or env)
+      let accessToken: string | undefined;
+
+      if (tiktokUserId) {
+        // Use OAuth token from database
+        this.logger.log(`Using OAuth token for user: ${tiktokUserId}`);
+        accessToken = await this.authService.getValidAccessToken(tiktokUserId);
+      } else {
+        // Fall back to static token from environment
+        this.logger.log('Using static token from environment');
+        accessToken = this.apiClient.getAccessToken();
+
+        if (!accessToken) {
+          throw new Error(
+            'TikTok authentication required. Please provide tiktokUserId or configure TIKTOK_ACCESS_TOKEN.',
+          );
+        }
       }
 
       // Validate content
@@ -51,7 +68,7 @@ export class TikTokService {
 
       // Step 1: Get creator info to check max video duration
       this.logger.log('Fetching creator information');
-      const creatorInfo = await this.apiClient.getCreatorInfo();
+      const creatorInfo = await this.apiClient.getCreatorInfo(accessToken);
 
       if (!creatorInfo.data) {
         throw new Error('Failed to retrieve creator information from TikTok');
@@ -98,7 +115,10 @@ export class TikTokService {
         },
       };
 
-      const initResult = await this.apiClient.initializeDirectPost(initRequest);
+      const initResult = await this.apiClient.initializeDirectPost(
+        initRequest,
+        accessToken,
+      );
 
       if (!initResult.data) {
         throw new Error('Failed to initialize TikTok video upload');
@@ -115,7 +135,7 @@ export class TikTokService {
 
       // Step 7: Poll for publish status
       this.logger.log('Video uploaded. Polling for publish status...');
-      const finalStatus = await this.pollPublishStatus(publishId);
+      const finalStatus = await this.pollPublishStatus(publishId, accessToken);
 
       if (!finalStatus.data) {
         throw new Error('Failed to get final publish status from TikTok');
@@ -165,10 +185,12 @@ export class TikTokService {
   /**
    * Poll TikTok publish status until complete or failed
    * @param publishId - Publish ID from initialization
+   * @param accessToken - Access token for API calls
    * @returns Final status response
    */
   private async pollPublishStatus(
     publishId: string,
+    accessToken: string,
   ): Promise<TikTokPublishStatusResponse> {
     const startTime = Date.now();
     let attempts = 0;
@@ -177,7 +199,10 @@ export class TikTokService {
       attempts++;
 
       try {
-        const status = await this.apiClient.getPublishStatus(publishId);
+        const status = await this.apiClient.getPublishStatus(
+          publishId,
+          accessToken,
+        );
 
         if (!status.data) {
           throw new Error('Invalid status response from TikTok');
