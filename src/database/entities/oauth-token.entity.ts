@@ -60,13 +60,13 @@ export class OAuthToken {
    * Platform-specific user ID or account ID
    * (e.g., Pinterest user ID, TikTok open ID)
    */
-  @Column({ name: 'platform_user_id', nullable: true })
+  @Column({ type: 'varchar', name: 'platform_user_id', nullable: true })
   platformUserId: string | null;
 
   /**
    * Platform-specific username or display name
    */
-  @Column({ name: 'platform_username', nullable: true })
+  @Column({ type: 'varchar', name: 'platform_username', nullable: true })
   platformUsername: string | null;
 
   /**
