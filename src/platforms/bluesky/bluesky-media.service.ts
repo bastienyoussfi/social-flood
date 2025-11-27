@@ -3,6 +3,7 @@ import { BlueskyApiClient } from './bluesky-api.client';
 import { MediaAttachment } from '../../common/interfaces';
 import {
   BlueskyBlobResponse,
+  BlueskyBlobWithAlt,
   BLUESKY_MAX_IMAGES,
   BLUESKY_MAX_IMAGE_SIZE,
 } from './interfaces/bluesky-api.interface';
@@ -42,9 +43,9 @@ export class BlueskyMediaService {
   /**
    * Upload media attachments to Bluesky
    * @param media - Array of media attachments with URLs
-   * @returns Array of Bluesky blob responses
+   * @returns Array of Bluesky blob responses with alt text
    */
-  async uploadMedia(media: MediaAttachment[]): Promise<BlueskyBlobResponse[]> {
+  async uploadMedia(media: MediaAttachment[]): Promise<BlueskyBlobWithAlt[]> {
     if (!media || media.length === 0) {
       return [];
     }
@@ -58,7 +59,7 @@ export class BlueskyMediaService {
 
     this.logger.log(`Uploading ${media.length} media item(s) to Bluesky`);
 
-    const blobs: BlueskyBlobResponse[] = [];
+    const blobs: BlueskyBlobWithAlt[] = [];
 
     for (let i = 0; i < media.length; i++) {
       const attachment = media[i];
@@ -79,11 +80,13 @@ export class BlueskyMediaService {
         // Upload single image
         const blob = await this.uploadSingleImage(attachment);
 
-        // Store alt text in blob metadata for later use
-        // Note: Alt text will be added to the embed when creating the post
-        (blob as any).alt = attachment.alt || '';
+        // Create blob with alt text metadata for later embedding
+        const blobWithAlt: BlueskyBlobWithAlt = {
+          ...blob,
+          alt: attachment.alt || '',
+        };
 
-        blobs.push(blob);
+        blobs.push(blobWithAlt);
 
         this.logger.log(
           `Media ${i + 1} uploaded successfully: ${blob.blob.ref.$link}`,

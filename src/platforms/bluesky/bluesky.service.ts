@@ -4,9 +4,9 @@ import { BlueskyApiClient } from './bluesky-api.client';
 import { BlueskyMediaService } from './bluesky-media.service';
 import {
   BlueskyPostResult,
+  BlueskyBlobWithAlt,
   BLUESKY_MAX_TEXT_LENGTH,
 } from './interfaces/bluesky-api.interface';
-import { BlueskyBlobResponse } from './interfaces/bluesky-api.interface';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 /**
@@ -47,7 +47,7 @@ export class BlueskyService {
       this.validateContent(content);
 
       // Step 1: Upload media if present
-      let imageBlobs: BlueskyBlobResponse[] = [];
+      let imageBlobs: BlueskyBlobWithAlt[] = [];
       if (content.media && content.media.length > 0) {
         this.logger.log(
           `Processing ${content.media.length} media attachment(s)`,

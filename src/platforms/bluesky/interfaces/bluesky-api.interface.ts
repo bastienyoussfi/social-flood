@@ -26,6 +26,14 @@ export interface BlueskyBlobResponse {
 }
 
 /**
+ * Bluesky blob response with alt text metadata
+ * Used when uploading images to store alt text for later embedding
+ */
+export interface BlueskyBlobWithAlt extends BlueskyBlobResponse {
+  alt: string;
+}
+
+/**
  * Bluesky image embed structure
  */
 export interface BlueskyImageEmbed {

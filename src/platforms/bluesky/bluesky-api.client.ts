@@ -6,11 +6,11 @@ import {
   BlueskySession,
 } from './interfaces/bluesky-config.interface';
 import {
-  BlueskyPostRecord,
-  BlueskyImageEmbed,
   BlueskyBlobResponse,
+  BlueskyBlobWithAlt,
   BlueskyPostResult,
 } from './interfaces/bluesky-api.interface';
+import type { AppBskyFeedPost } from '@atproto/api';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 /**
@@ -114,12 +114,12 @@ export class BlueskyApiClient {
   /**
    * Post content to Bluesky
    * @param text - Post text content
-   * @param imageBlobs - Array of uploaded image blobs (optional)
+   * @param imageBlobs - Array of uploaded image blobs with alt text (optional)
    * @returns Post ID, URL, URI, and CID
    */
   async createPost(
     text: string,
-    imageBlobs?: BlueskyBlobResponse[],
+    imageBlobs?: BlueskyBlobWithAlt[],
   ): Promise<BlueskyPostResult> {
     try {
       this.logger.log(
@@ -137,8 +137,9 @@ export class BlueskyApiClient {
       const richText = new RichText({ text });
       await richText.detectFacets(this.agent);
 
-      // Build post data
-      const postData: any = {
+      // Build post data with proper typing
+      const postData: Partial<AppBskyFeedPost.Record> &
+        Pick<AppBskyFeedPost.Record, 'text' | 'createdAt'> = {
         text: richText.text,
         createdAt: new Date().toISOString(),
       };
@@ -149,14 +150,16 @@ export class BlueskyApiClient {
       }
 
       // Add image embeds if provided
+      // Note: We use type assertion here because the SDK expects BlobRef class instances,
+      // but the AT Protocol API accepts plain JSON blob references
       if (imageBlobs && imageBlobs.length > 0) {
         postData.embed = {
           $type: 'app.bsky.embed.images',
           images: imageBlobs.map((blob) => ({
-            alt: (blob as any).alt || '', // Alt text stored by media service
+            alt: blob.alt,
             image: blob.blob,
           })),
-        };
+        } as AppBskyFeedPost.Record['embed'];
         this.logger.log(`Attaching ${imageBlobs.length} image(s)`);
       }
 
@@ -195,7 +198,9 @@ export class BlueskyApiClient {
     mimeType: string,
   ): Promise<BlueskyBlobResponse> {
     try {
-      this.logger.log(`Uploading blob (${mimeType}, ${imageBuffer.length} bytes)`);
+      this.logger.log(
+        `Uploading blob (${mimeType}, ${imageBuffer.length} bytes)`,
+      );
 
       // Ensure we're authenticated
       await this.authenticate();
@@ -205,18 +210,21 @@ export class BlueskyApiClient {
         encoding: mimeType,
       });
 
-      if (!response.data?.blob) {
+      const blobData = response.data?.blob;
+      if (!blobData) {
         throw new Error('Bluesky API returned no blob data');
       }
 
-      this.logger.log(`Blob uploaded successfully: ${response.data.blob.ref.$link}`);
+      // Access the $link safely from the blob reference
+      const blobRef = blobData.ref as { $link: string };
+      this.logger.log(`Blob uploaded successfully: ${blobRef.$link}`);
 
       return {
         blob: {
           $type: 'blob',
-          ref: response.data.blob.ref,
-          mimeType: response.data.blob.mimeType,
-          size: response.data.blob.size,
+          ref: blobData.ref as { $link: string },
+          mimeType: blobData.mimeType,
+          size: blobData.size,
         },
       };
     } catch (error) {
@@ -258,7 +266,10 @@ export class BlueskyApiClient {
     this.logger.error('Bluesky API error', errorStack);
 
     // Check for specific error patterns
-    if (errorMessage.includes('401') || errorMessage.includes('authentication')) {
+    if (
+      errorMessage.includes('401') ||
+      errorMessage.includes('authentication')
+    ) {
       throw new Error(
         'Bluesky authentication failed. Please check your handle and app password.',
       );
