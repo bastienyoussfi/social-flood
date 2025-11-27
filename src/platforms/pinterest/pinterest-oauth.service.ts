@@ -19,7 +19,8 @@ export class PinterestOAuthService {
   private readonly logger = new Logger(PinterestOAuthService.name);
   private readonly config: PinterestConfig;
   private readonly redirectUri: string;
-  private readonly authBaseUrl = 'https://www.pinterest.com/oauth';
+  private readonly authorizationBaseUrl = 'https://www.pinterest.com/oauth';
+  private readonly tokenUrl = 'https://api.pinterest.com/v5/oauth/token';
 
   // Pinterest OAuth scopes
   // See: https://developers.pinterest.com/docs/getting-started/scopes/
@@ -83,7 +84,7 @@ export class PinterestOAuthService {
       state: stateParam,
     });
 
-    const authUrl = `${this.authBaseUrl}/?${params.toString()}`;
+    const authUrl = `${this.authorizationBaseUrl}/?${params.toString()}`;
 
     this.logger.log(`Generated authorization URL for user ${userId}`);
     return authUrl;
@@ -134,38 +135,13 @@ export class PinterestOAuthService {
    * Request access token from Pinterest
    */
   private async requestAccessToken(code: string): Promise<PinterestAuthToken> {
-    const tokenUrl = `${this.authBaseUrl}/token`;
-
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
-      code: code,
+      code,
       redirect_uri: this.redirectUri,
     });
 
-    const authHeader = Buffer.from(
-      `${this.config.appId}:${this.config.appSecret}`,
-    ).toString('base64');
-
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${authHeader}`,
-      },
-      body: params.toString(),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      this.logger.error(`Pinterest token request failed: ${errorText}`);
-      throw new Error(
-        `Pinterest token request failed: ${response.status} ${errorText}`,
-      );
-    }
-
-    const tokenData: PinterestAuthToken =
-      (await response.json()) as PinterestAuthToken;
-    return tokenData;
+    return this.sendTokenRequest(params);
   }
 
   /**
@@ -189,35 +165,12 @@ export class PinterestOAuthService {
       }
 
       // Request new token
-      const tokenUrl = `${this.authBaseUrl}/token`;
-
       const params = new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: existingToken.refreshToken,
       });
 
-      const authHeader = Buffer.from(
-        `${this.config.appId}:${this.config.appSecret}`,
-      ).toString('base64');
-
-      const response = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: `Basic ${authHeader}`,
-        },
-        body: params.toString(),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Token refresh failed: ${response.status} ${errorText}`,
-        );
-      }
-
-      const tokenData: PinterestAuthToken =
-        (await response.json()) as PinterestAuthToken;
+      const tokenData = await this.sendTokenRequest(params);
 
       // Update token in database
       const updatedToken = await this.saveToken(userId, tokenData);
@@ -230,6 +183,50 @@ export class PinterestOAuthService {
 
       this.logger.error(`Failed to refresh token: ${errorMessage}`, errorStack);
       throw new Error(`Token refresh failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Execute a Pinterest token request and ensure we get JSON back
+   */
+  private async sendTokenRequest(
+    params: URLSearchParams,
+  ): Promise<PinterestAuthToken> {
+    const authHeader = Buffer.from(
+      `${this.config.appId}:${this.config.appSecret}`,
+    ).toString('base64');
+
+    const response = await fetch(this.tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+        Authorization: `Basic ${authHeader}`,
+      },
+      body: params.toString(),
+    });
+
+    const rawBody = await response.text();
+
+    if (!response.ok) {
+      this.logger.error(
+        `Pinterest token request failed (${response.status}): ${rawBody}`,
+      );
+      throw new Error(
+        `Pinterest token request failed: ${response.status} ${rawBody}`,
+      );
+    }
+
+    try {
+      return JSON.parse(rawBody) as PinterestAuthToken;
+    } catch (parseError) {
+      this.logger.error(
+        'Pinterest token endpoint returned non-JSON response : ' + parseError,
+        rawBody.substring(0, 200),
+      );
+      throw new Error(
+        'Pinterest token endpoint returned invalid JSON. Check your redirect URI and app credentials.',
+      );
     }
   }
 
