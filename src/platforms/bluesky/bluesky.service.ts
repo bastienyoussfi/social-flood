@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PostContent } from '../../common/interfaces';
 import { BlueskyApiClient } from './bluesky-api.client';
 import { BlueskyMediaService } from './bluesky-media.service';
-import { BlueskyPostResult, BLUESKY_MAX_TEXT_LENGTH } from './interfaces/bluesky-api.interface';
+import {
+  BlueskyPostResult,
+  BLUESKY_MAX_TEXT_LENGTH,
+} from './interfaces/bluesky-api.interface';
 import { BlueskyBlobResponse } from './interfaces/bluesky-api.interface';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
@@ -91,7 +94,10 @@ export class BlueskyService {
       const errorMessage = getErrorMessage(error);
       const errorStack = getErrorStack(error);
 
-      this.logger.error(`Failed to publish to Bluesky: ${errorMessage}`, errorStack);
+      this.logger.error(
+        `Failed to publish to Bluesky: ${errorMessage}`,
+        errorStack,
+      );
 
       // Re-throw with context
       throw new Error(`Bluesky posting failed: ${errorMessage}`);
@@ -110,7 +116,9 @@ export class BlueskyService {
     // Bluesky's character limit is already validated in the adapter
     // This is a safety check
     if (content.text.length > BLUESKY_MAX_TEXT_LENGTH) {
-      throw new Error(`Post text exceeds ${BLUESKY_MAX_TEXT_LENGTH} characters`);
+      throw new Error(
+        `Post text exceeds ${BLUESKY_MAX_TEXT_LENGTH} characters`,
+      );
     }
   }
 

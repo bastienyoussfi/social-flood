@@ -84,9 +84,7 @@ export class PinterestMediaService {
       const response = await fetch(url, { method: 'HEAD' });
 
       if (!response.ok) {
-        throw new Error(
-          `Image URL is not accessible: HTTP ${response.status}`,
-        );
+        throw new Error(`Image URL is not accessible: HTTP ${response.status}`);
       }
 
       // Validate content type
