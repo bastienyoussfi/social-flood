@@ -16,17 +16,26 @@ import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 /**
  * Twitter API v2 Client
  * Handles all direct communication with Twitter API
- * Uses OAuth 1.0a for authentication (required for posting)
+ * Supports both OAuth 1.0a (app-level) and OAuth 2.0 (user-level) authentication
  */
 @Injectable()
 export class TwitterApiClient {
   private readonly logger = new Logger(TwitterApiClient.name);
   private client: TwitterApi;
   private readonly config: TwitterConfig;
+  private readonly isOAuth1Configured: boolean;
 
   constructor(private readonly configService: ConfigService) {
     this.config = this.loadConfig();
-    this.initializeClient();
+    this.isOAuth1Configured = this.checkOAuth1Config();
+    if (this.isOAuth1Configured) {
+      this.initializeClient();
+    } else {
+      this.logger.warn(
+        'Twitter OAuth 1.0a credentials not configured. App-level posting disabled. ' +
+          'User-level OAuth 2.0 posting is still available.',
+      );
+    }
   }
 
   /**
@@ -42,14 +51,6 @@ export class TwitterApiClient {
       this.configService.get<string>('TWITTER_ACCESS_TOKEN_SECRET') || '';
     const bearerToken = this.configService.get<string>('TWITTER_BEARER_TOKEN');
 
-    // Validate required OAuth 1.0a credentials
-    if (!apiKey || !apiSecret || !accessToken || !accessTokenSecret) {
-      throw new Error(
-        'Twitter OAuth 1.0a credentials are not properly configured. ' +
-          'Please set TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, and TWITTER_ACCESS_TOKEN_SECRET',
-      );
-    }
-
     const config: TwitterConfig = {
       apiKey,
       apiSecret,
@@ -59,6 +60,18 @@ export class TwitterApiClient {
     };
 
     return config;
+  }
+
+  /**
+   * Check if OAuth 1.0a credentials are configured
+   */
+  private checkOAuth1Config(): boolean {
+    return !!(
+      this.config.apiKey &&
+      this.config.apiSecret &&
+      this.config.accessToken &&
+      this.config.accessTokenSecret
+    );
   }
 
   /**
@@ -217,14 +230,107 @@ export class TwitterApiClient {
   }
 
   /**
-   * Check if the client is properly configured
+   * Check if the OAuth 1.0a client is properly configured
    */
   isConfigured(): boolean {
-    return !!(
-      this.config.apiKey &&
-      this.config.apiSecret &&
-      this.config.accessToken &&
-      this.config.accessTokenSecret
-    );
+    return this.isOAuth1Configured;
+  }
+
+  /**
+   * Create a Twitter API client for a specific user using OAuth 2.0 access token
+   * @param accessToken - User's OAuth 2.0 access token
+   * @returns TwitterApi client instance configured for the user
+   */
+  createUserClient(accessToken: string): TwitterApi {
+    this.logger.log('Creating user-level Twitter API client with OAuth 2.0');
+    return new TwitterApi(accessToken);
+  }
+
+  /**
+   * Post a tweet on behalf of a user using their OAuth 2.0 access token
+   * @param accessToken - User's OAuth 2.0 access token
+   * @param text - Tweet text content
+   * @param mediaIds - Array of uploaded media IDs (optional)
+   * @returns Tweet ID and URL
+   */
+  async postTweetAsUser(
+    accessToken: string,
+    text: string,
+    mediaIds?: string[],
+  ): Promise<TwitterPostResult> {
+    try {
+      const userClient = this.createUserClient(accessToken);
+
+      this.logger.log(
+        `Posting tweet as user: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
+      );
+
+      const tweetData: SendTweetV2Params = { text };
+
+      // Add media if provided
+      if (mediaIds && mediaIds.length > 0) {
+        const limitedIds = mediaIds.slice(0, 4);
+        let typedMediaIds:
+          | [string]
+          | [string, string]
+          | [string, string, string]
+          | [string, string, string, string];
+
+        switch (limitedIds.length) {
+          case 1:
+            typedMediaIds = [limitedIds[0]];
+            break;
+          case 2:
+            typedMediaIds = [limitedIds[0], limitedIds[1]];
+            break;
+          case 3:
+            typedMediaIds = [limitedIds[0], limitedIds[1], limitedIds[2]];
+            break;
+          default:
+            typedMediaIds = [
+              limitedIds[0],
+              limitedIds[1],
+              limitedIds[2],
+              limitedIds[3],
+            ];
+        }
+
+        tweetData.media = {
+          media_ids: typedMediaIds,
+        };
+        this.logger.log(`Attaching ${limitedIds.length} media item(s)`);
+      }
+
+      // Post the tweet using v2 API
+      const result: TweetV2PostTweetResult =
+        await userClient.v2.tweet(tweetData);
+
+      if (!result.data?.id) {
+        throw new Error('Twitter API returned no tweet ID');
+      }
+
+      const tweetId = result.data.id;
+      const url = this.buildTweetUrl(tweetId);
+
+      this.logger.log(`Tweet posted successfully as user: ${url}`);
+
+      return {
+        tweetId,
+        url,
+        text: result.data.text,
+      };
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Get a user client for media uploads
+   * Note: Media upload with OAuth 2.0 requires different handling
+   * @param accessToken - User's OAuth 2.0 access token
+   * @returns TwitterApi client instance
+   */
+  getUserV1Client(accessToken: string): TwitterApi {
+    return this.createUserClient(accessToken);
   }
 }

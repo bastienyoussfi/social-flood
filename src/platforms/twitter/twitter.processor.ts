@@ -16,7 +16,19 @@ export class TwitterProcessor {
     this.logger.log(`Processing Twitter post job ${job.id}`);
 
     try {
-      const result = await this.twitterService.publishPost(job.data);
+      // Extract twitterUserId from metadata if present (for user-level OAuth 2.0 posting)
+      const twitterUserId = job.data.metadata?.twitterUserId as
+        | string
+        | undefined;
+
+      if (twitterUserId) {
+        this.logger.log(`Posting as Twitter user: ${twitterUserId}`);
+      }
+
+      const result = await this.twitterService.publishPost(
+        job.data,
+        twitterUserId,
+      );
       this.logger.log(`Twitter post ${job.id} completed successfully`);
       return result;
     } catch (error) {

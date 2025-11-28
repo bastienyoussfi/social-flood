@@ -91,4 +91,14 @@ export class CreatePostDto {
   @IsOptional()
   @IsString()
   tiktokUserId?: string;
+
+  @ApiProperty({
+    description:
+      'Twitter user ID (optional, for posting on behalf of a user with OAuth 2.0)',
+    required: false,
+    example: '1234567890123456789',
+  })
+  @IsOptional()
+  @IsString()
+  twitterUserId?: string;
 }

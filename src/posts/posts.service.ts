@@ -64,6 +64,9 @@ export class PostsService {
         ...(createPostDto.tiktokUserId && {
           tiktokUserId: createPostDto.tiktokUserId,
         }),
+        ...(createPostDto.twitterUserId && {
+          twitterUserId: createPostDto.twitterUserId,
+        }),
       },
     };
 

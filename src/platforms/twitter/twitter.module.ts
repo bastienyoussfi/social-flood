@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -9,6 +9,7 @@ import { TwitterApiClient } from './twitter-api.client';
 import { TwitterMediaService } from './twitter-media.service';
 import { TwitterQueueService } from './twitter-queue.service';
 import { PlatformPost, Post } from '../../database/entities';
+import { AuthModule } from '../../auth/auth.module';
 
 /**
  * Twitter Module
@@ -21,6 +22,10 @@ import { PlatformPost, Post } from '../../database/entities';
  * - TwitterApiClient: Handles Twitter API v2 communication
  * - TwitterMediaService: Handles media upload
  * - TwitterQueueService: Handles queue events and database updates
+ *
+ * Supports both:
+ * - OAuth 1.0a: App-level posting (using env credentials)
+ * - OAuth 2.0: User-level posting (via AuthModule)
  */
 @Module({
   imports: [
@@ -29,6 +34,7 @@ import { PlatformPost, Post } from '../../database/entities';
     BullModule.registerQueue({
       name: 'twitter-posts',
     }),
+    forwardRef(() => AuthModule),
   ],
   providers: [
     TwitterApiClient,
