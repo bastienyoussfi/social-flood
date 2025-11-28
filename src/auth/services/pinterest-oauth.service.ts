@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { OAuthToken } from '../../database/entities';
+import { SocialConnection } from '../../database/entities';
 import { BaseOAuthService } from '../base-oauth.service';
 import { OAuthStateManager } from '../utils/state-manager';
 import {
@@ -24,12 +24,12 @@ export class PinterestOAuthService extends BaseOAuthService {
   protected readonly config: OAuthConfig;
 
   constructor(
-    @InjectRepository(OAuthToken)
-    oauthTokenRepository: Repository<OAuthToken>,
+    @InjectRepository(SocialConnection)
+    socialConnectionRepository: Repository<SocialConnection>,
     stateManager: OAuthStateManager,
     private readonly configService: ConfigService,
   ) {
-    super(oauthTokenRepository, stateManager);
+    super(socialConnectionRepository, stateManager);
     this.config = this.loadConfig();
 
     if (!this.isConfigured()) {
@@ -113,8 +113,8 @@ export class PinterestOAuthService extends BaseOAuthService {
       // Pinterest token response may not include user info, so we fetch it separately
       const userInfo = await this.fetchUserInfo(tokenResponse.access_token);
 
-      // Save token
-      const oauthToken = await this.saveToken(userId, tokenResponse, userInfo);
+      // Save connection
+      const connection = await this.saveToken(userId, tokenResponse, userInfo);
 
       this.logger.log(
         `Successfully authenticated Pinterest user: ${userInfo.username} (${userInfo.id})`,
@@ -126,8 +126,8 @@ export class PinterestOAuthService extends BaseOAuthService {
         platform: this.platform,
         platformUserId: userInfo.id,
         platformUsername: userInfo.username,
-        scopes: oauthToken.scopes,
-        expiresAt: oauthToken.expiresAt || undefined,
+        scopes: connection.scopes,
+        expiresAt: connection.expiresAt || undefined,
         metadata: userInfo.metadata,
       };
     } catch (error) {
@@ -195,12 +195,12 @@ export class PinterestOAuthService extends BaseOAuthService {
    * Refresh access token (Pinterest uses Basic auth)
    */
   override async refreshAccessToken(
-    oauthToken: OAuthToken,
-  ): Promise<OAuthToken> {
+    connection: SocialConnection,
+  ): Promise<SocialConnection> {
     try {
-      this.logger.log(`Refreshing access token for user: ${oauthToken.userId}`);
+      this.logger.log(`Refreshing access token for user: ${connection.userId}`);
 
-      if (!oauthToken.refreshToken) {
+      if (!connection.refreshToken) {
         throw new Error(
           'No refresh token available. User needs to re-authenticate.',
         );
@@ -212,7 +212,7 @@ export class PinterestOAuthService extends BaseOAuthService {
 
       const params = new URLSearchParams({
         grant_type: 'refresh_token',
-        refresh_token: oauthToken.refreshToken,
+        refresh_token: connection.refreshToken,
       });
 
       const response = await fetch(this.config.tokenUrl, {
@@ -236,23 +236,23 @@ export class PinterestOAuthService extends BaseOAuthService {
 
       // Update tokens
       const now = new Date();
-      oauthToken.accessToken = tokenData.access_token;
+      connection.accessToken = tokenData.access_token;
       if (tokenData.refresh_token) {
-        oauthToken.refreshToken = tokenData.refresh_token;
+        connection.refreshToken = tokenData.refresh_token;
       }
-      oauthToken.expiresAt = tokenData.expires_in
+      connection.expiresAt = tokenData.expires_in
         ? new Date(now.getTime() + tokenData.expires_in * 1000)
-        : oauthToken.expiresAt;
+        : connection.expiresAt;
 
       if (tokenData.scope) {
-        oauthToken.scopes = tokenData.scope.split(',');
+        connection.scopes = tokenData.scope.split(',');
       }
 
-      await this.oauthTokenRepository.save(oauthToken);
+      await this.socialConnectionRepository.save(connection);
 
       this.logger.log('Access token refreshed successfully');
 
-      return oauthToken;
+      return connection;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       const errorStack = getErrorStack(error);
@@ -307,7 +307,7 @@ export class PinterestOAuthService extends BaseOAuthService {
    * Get access token for API calls (convenience method)
    */
   async getAccessToken(userId: string): Promise<string | null> {
-    const token = await this.getToken(userId);
-    return token?.accessToken || null;
+    const connection = await this.getConnection(userId);
+    return connection?.accessToken || null;
   }
 }

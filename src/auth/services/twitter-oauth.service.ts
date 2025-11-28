@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TwitterApi } from 'twitter-api-v2';
-import { OAuthToken } from '../../database/entities';
+import { SocialConnection } from '../../database/entities';
 import { BaseOAuthService } from '../base-oauth.service';
 import { OAuthStateManager } from '../utils/state-manager';
 import {
@@ -26,12 +26,12 @@ export class TwitterOAuthService extends BaseOAuthService {
   protected readonly config: OAuthConfig;
 
   constructor(
-    @InjectRepository(OAuthToken)
-    oauthTokenRepository: Repository<OAuthToken>,
+    @InjectRepository(SocialConnection)
+    socialConnectionRepository: Repository<SocialConnection>,
     stateManager: OAuthStateManager,
     private readonly configService: ConfigService,
   ) {
-    super(oauthTokenRepository, stateManager);
+    super(socialConnectionRepository, stateManager);
     this.config = this.loadConfig();
 
     if (!this.isConfigured()) {
@@ -122,8 +122,8 @@ export class TwitterOAuthService extends BaseOAuthService {
       // Get user info
       const userInfo = await this.fetchUserInfo(tokenResponse.access_token);
 
-      // Save token
-      const oauthToken = await this.saveToken(userId, tokenResponse, userInfo);
+      // Save connection
+      const connection = await this.saveToken(userId, tokenResponse, userInfo);
 
       this.logger.log(
         `Successfully authenticated Twitter user: @${userInfo.username} (${userInfo.id})`,
@@ -135,8 +135,8 @@ export class TwitterOAuthService extends BaseOAuthService {
         platform: this.platform,
         platformUserId: userInfo.id,
         platformUsername: userInfo.username,
-        scopes: oauthToken.scopes,
-        expiresAt: oauthToken.expiresAt || undefined,
+        scopes: connection.scopes,
+        expiresAt: connection.expiresAt || undefined,
         metadata: userInfo.metadata,
       };
     } catch (error) {
@@ -189,12 +189,12 @@ export class TwitterOAuthService extends BaseOAuthService {
    * Refresh access token with Basic auth
    */
   override async refreshAccessToken(
-    oauthToken: OAuthToken,
-  ): Promise<OAuthToken> {
+    connection: SocialConnection,
+  ): Promise<SocialConnection> {
     try {
-      this.logger.log(`Refreshing access token for user: ${oauthToken.userId}`);
+      this.logger.log(`Refreshing access token for user: ${connection.userId}`);
 
-      if (!oauthToken.refreshToken) {
+      if (!connection.refreshToken) {
         throw new Error(
           'No refresh token available. User needs to re-authenticate.',
         );
@@ -212,7 +212,7 @@ export class TwitterOAuthService extends BaseOAuthService {
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: oauthToken.refreshToken,
+          refresh_token: connection.refreshToken,
         }),
       });
 
@@ -226,23 +226,23 @@ export class TwitterOAuthService extends BaseOAuthService {
       const tokenData = (await response.json()) as OAuthTokenResponse;
 
       // Update tokens
-      oauthToken.accessToken = tokenData.access_token;
+      connection.accessToken = tokenData.access_token;
       if (tokenData.refresh_token) {
-        oauthToken.refreshToken = tokenData.refresh_token;
+        connection.refreshToken = tokenData.refresh_token;
       }
-      oauthToken.expiresAt = tokenData.expires_in
+      connection.expiresAt = tokenData.expires_in
         ? new Date(Date.now() + tokenData.expires_in * 1000)
-        : oauthToken.expiresAt;
+        : connection.expiresAt;
 
       if (tokenData.scope) {
-        oauthToken.scopes = tokenData.scope.split(' ');
+        connection.scopes = tokenData.scope.split(' ');
       }
 
-      await this.oauthTokenRepository.save(oauthToken);
+      await this.socialConnectionRepository.save(connection);
 
       this.logger.log('Access token refreshed successfully');
 
-      return oauthToken;
+      return connection;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       const errorStack = getErrorStack(error);

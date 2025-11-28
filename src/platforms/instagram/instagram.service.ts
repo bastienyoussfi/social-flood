@@ -178,6 +178,6 @@ export class InstagramService {
    * Check if a user has valid Instagram authentication
    */
   async hasValidAuth(userId: string): Promise<boolean> {
-    return this.oauthService.hasValidToken(userId);
+    return this.oauthService.hasValidConnection(userId);
   }
 }

@@ -57,6 +57,23 @@ docker-compose down -v
 
 ## Architecture
 
+### Authentication System (Two-Layer)
+
+The application uses a two-layer authentication approach:
+
+1. **User Authentication (better-auth)** - `src/better-auth/`
+   - Email/password signup and login
+   - Google OAuth login
+   - GitHub OAuth login
+   - Session management
+   - Configured in `src/lib/auth.ts`
+
+2. **Social Platform Connections** - `src/auth/` and `src/connections/`
+   - OAuth flows for social platforms (LinkedIn, Twitter, TikTok, etc.)
+   - Multiple accounts per platform per user
+   - Stored in `social_connections` table
+   - Managed via `ConnectionsService`
+
 ### Platform Adapter Pattern
 
 Each social media platform follows a consistent module structure:
@@ -97,7 +114,7 @@ src/platforms/{platform}/
 
 ### Database Schema
 
-**Two-table design**:
+**Core Tables**:
 
 1. **posts** - Parent post entity
    - `id` (UUID)
@@ -113,19 +130,32 @@ src/platforms/{platform}/
    - `status` (queued | posted | failed)
    - `posted_at`, `url`, `error_message`
 
-Additional entities:
-- **oauth_token** - OAuth tokens for LinkedIn
-- **tiktok_auth** - TikTok OAuth credentials and refresh tokens
+3. **social_connections** - OAuth tokens for social platforms
+   - `id` (UUID)
+   - `user_id` (FK to better-auth user table)
+   - `platform` (linkedin | twitter | tiktok | pinterest | instagram | youtube)
+   - `display_name` - User-friendly name for the connection
+   - `access_token`, `refresh_token`
+   - `expires_at`, `refresh_expires_at`
+   - `platform_user_id`, `platform_username`
+   - `scopes`, `metadata`, `is_active`
+   - Unique constraint on (`user_id`, `platform`, `platform_user_id`) - allows multiple accounts per platform
 
-### Authentication
+**Better-Auth Tables** (auto-created):
+- `user` - User accounts
+- `session` - Active sessions
+- `account` - OAuth accounts (Google, GitHub)
+- `verification` - Email verification tokens
 
-**AuthModule** (`src/auth/`) currently handles OAuth flows for platforms requiring it:
-- TikTok uses OAuth 2.0 with refresh tokens
-- Pinterest uses OAuth 2.0
-- LinkedIn uses OAuth 2.0
-- Twitter uses OAuth 2.0 with PKCE
-- Instagram uses Meta's OAuth 2.0 (via Facebook Graph API)
-- Bluesky uses app passwords
+### OAuth Services
+
+All platform OAuth services extend `BaseOAuthService` (`src/auth/base-oauth.service.ts`):
+- `LinkedInOAuthService`
+- `TwitterOAuthService` (uses PKCE)
+- `TikTokOAuthService`
+- `PinterestOAuthService`
+- `InstagramOAuthService` (via Meta Graph API)
+- `YouTubeOAuthService` (via Google OAuth)
 
 ## Platform-Specific Notes
 
@@ -146,20 +176,29 @@ Each platform has its own media upload flow:
 - TikTok: Video upload via chunked upload API
 - Instagram: Container-based 2-step flow (create container → publish)
 
-### OAuth Flows
-- All OAuth platforms have callback endpoints at `/api/auth/{platform}/callback`
-- Tokens are stored in database and automatically refreshed when expired
-- Use platform-specific OAuth services: `TikTokAuthService`, `PinterestAuthService`, `InstagramOAuthService`, etc.
-- Instagram requires Business/Creator account linked to a Facebook Page
-
 ## API Structure
 
-**Main endpoint**: `POST /api/posts/multi-platform`
-- Body: `CreatePostDto` (text, media, link, platforms array, optional tiktokUserId)
-- Returns: Job IDs for each platform queue
+### User Authentication (better-auth)
+All routes at `/api/auth/*`:
+- `POST /api/auth/sign-up/email` - Email/password signup
+- `POST /api/auth/sign-in/email` - Email/password login
+- `GET /api/auth/sign-in/social?provider=google` - Google OAuth
+- `GET /api/auth/sign-in/social?provider=github` - GitHub OAuth
+- `POST /api/auth/sign-out` - Logout
 
-**Other endpoints**:
+### Social Connections (requires authentication)
+- `GET /api/connections` - List all connected platforms
+- `GET /api/connections/:platform/connect` - Initiate platform OAuth
+- `GET /api/connections/:platform/callback` - OAuth callback
+- `DELETE /api/connections/:id` - Disconnect a platform
+- `POST /api/connections/:id/refresh` - Force token refresh
+- `GET /api/connections/details/:id` - Get connection details
+
+### Posting
+- `POST /api/posts/multi-platform` - Create multi-platform post
 - `GET /api/posts/:id` - Get post status across all platforms
+
+### System
 - `GET /health` - Health check (database + redis)
 - `GET /api/queues/status` - Queue status for all platforms
 
@@ -181,13 +220,23 @@ Required variables are in `.env.example`. Key ones:
 - `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`
 - `REDIS_HOST`, `REDIS_PORT`
 
-**Platform Credentials**:
+**Better Auth (User Authentication)**:
+- `BETTER_AUTH_SECRET` - Secret for signing tokens
+- `BETTER_AUTH_URL` - Base URL for OAuth callbacks (default: http://localhost:3000)
+- `FRONTEND_URL` - Frontend URL for CORS (default: http://localhost:5173)
+
+**User Login Providers** (Google/GitHub):
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+
+**Social Platform Credentials**:
 - LinkedIn: `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_REDIRECT_URI`
-- Twitter: `TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET`
+- Twitter: `TWITTER_CLIENT_ID`, `TWITTER_CLIENT_SECRET`, `TWITTER_OAUTH_REDIRECT_URI`
 - Bluesky: `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`
 - TikTok: `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_REDIRECT_URI`
 - Pinterest: `PINTEREST_APP_ID`, `PINTEREST_APP_SECRET`, `PINTEREST_REDIRECT_URI`
 - Instagram: `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI`
+- YouTube: `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REDIRECT_URI`
 
 ## Adding a New Platform
 
@@ -202,7 +251,8 @@ Required variables are in `.env.example`. Key ones:
 4. Register queue in `src/app.module.ts`:
    - Import module
    - Add to `BullModule.registerQueue()`
-5. Update `docker-compose.yml` if new env vars needed
+5. Create OAuth service in `src/auth/services/` if platform requires OAuth
+6. Update `docker-compose.yml` if new env vars needed
 
 ## Testing Conventions
 
@@ -233,3 +283,18 @@ Required variables are in `.env.example`. Key ones:
 - Use NestJS `Logger` for logging (avoid `console.log`)
 - Validation with `class-validator` decorators on DTOs
 - Error handling: catch in processors, log with context, throw to trigger retry
+
+## Database Migration
+
+To migrate from the old `oauth_tokens` table to `social_connections`:
+
+```bash
+# Run the migration SQL (in postgres)
+psql -f src/database/migrations/001-cleanup-legacy-tables.sql
+```
+
+This migration:
+1. Drops the legacy `tiktok_auth` table
+2. Creates the new `social_connections` table
+3. Migrates data from `oauth_tokens` if it exists
+4. Drops the old `oauth_tokens` table

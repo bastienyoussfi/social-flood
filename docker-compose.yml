@@ -76,6 +76,10 @@ services:
       META_APP_ID: ${META_APP_ID}
       META_APP_SECRET: ${META_APP_SECRET}
       META_REDIRECT_URI: ${META_REDIRECT_URI}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy

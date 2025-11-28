@@ -5,7 +5,9 @@ import { BullModule } from '@nestjs/bull';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PostsModule } from './posts/posts.module';
+import { BetterAuthModule } from './better-auth';
 import { AuthModule } from './auth/auth.module';
+import { ConnectionsModule } from './connections';
 import { LinkedInModule } from './platforms/linkedin/linkedin.module';
 import { TwitterModule } from './platforms/twitter/twitter.module';
 import { BlueskyModule } from './platforms/bluesky/bluesky.module';
@@ -49,8 +51,14 @@ import { getRedisConfig } from './config/redis.config';
       { name: 'instagram-posts' },
     ),
 
-    // Authentication
+    // User Authentication (better-auth: email/password, Google, GitHub)
+    BetterAuthModule,
+
+    // Social Platform OAuth (LinkedIn, Twitter, TikTok, etc.)
     AuthModule,
+
+    // Unified Social Connections Management
+    ConnectionsModule,
 
     // Platform modules
     LinkedInModule,

@@ -130,23 +130,25 @@ export class TwitterService {
     platformPostId: string;
     url: string;
   }> {
-    // Get the OAuth token by platform user ID
-    const oauthToken =
-      await this.twitterOAuthService.getTokenByPlatformUserId(twitterUserId);
+    // Get the connection by platform user ID
+    const connection =
+      await this.twitterOAuthService.getConnectionByPlatformUserId(
+        twitterUserId,
+      );
 
-    if (!oauthToken) {
+    if (!connection) {
       throw new Error(
         `Twitter authentication not found for user ${twitterUserId}. Please authenticate first.`,
       );
     }
 
     // Refresh if needed
-    let accessToken = oauthToken.accessToken;
-    if (oauthToken.needsRefresh()) {
+    let accessToken = connection.accessToken;
+    if (connection.needsRefresh()) {
       this.logger.log('Access token needs refresh, refreshing...');
-      const refreshedToken =
-        await this.twitterOAuthService.refreshAccessToken(oauthToken);
-      accessToken = refreshedToken.accessToken;
+      const refreshedConnection =
+        await this.twitterOAuthService.refreshAccessToken(connection);
+      accessToken = refreshedConnection.accessToken;
     }
 
     // Validate content

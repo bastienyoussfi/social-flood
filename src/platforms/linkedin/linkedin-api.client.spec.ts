@@ -30,7 +30,7 @@ describe('LinkedInApiClient', () => {
   const mockOAuthService = {
     getAccessToken: jest.fn(),
     getPersonUrn: jest.fn(),
-    hasValidToken: jest.fn(),
+    hasValidConnection: jest.fn(),
   };
 
   beforeEach(async () => {

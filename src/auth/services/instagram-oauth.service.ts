@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { OAuthToken } from '../../database/entities';
+import { SocialConnection } from '../../database/entities';
 import { BaseOAuthService } from '../base-oauth.service';
 import { OAuthStateManager } from '../utils/state-manager';
 import {
@@ -80,12 +80,12 @@ export class InstagramOAuthService extends BaseOAuthService {
   private readonly GRAPH_API_VERSION = 'v18.0';
 
   constructor(
-    @InjectRepository(OAuthToken)
-    oauthTokenRepository: Repository<OAuthToken>,
+    @InjectRepository(SocialConnection)
+    socialConnectionRepository: Repository<SocialConnection>,
     stateManager: OAuthStateManager,
     private readonly configService: ConfigService,
   ) {
-    super(oauthTokenRepository, stateManager);
+    super(socialConnectionRepository, stateManager);
     this.config = this.loadConfig();
 
     if (!this.isConfigured()) {
@@ -160,8 +160,8 @@ export class InstagramOAuthService extends BaseOAuthService {
         instagramAccount.igUserId,
       );
 
-      // Save token with Instagram-specific metadata
-      const oauthToken = await this.saveToken(
+      // Save connection with Instagram-specific metadata
+      const connection = await this.saveToken(
         userId,
         {
           access_token: longLivedToken.access_token,
@@ -189,9 +189,9 @@ export class InstagramOAuthService extends BaseOAuthService {
         platform: this.platform,
         platformUserId: userInfo.id,
         platformUsername: userInfo.username,
-        scopes: oauthToken.scopes,
-        expiresAt: oauthToken.expiresAt || undefined,
-        metadata: oauthToken.metadata as Record<string, unknown>,
+        scopes: connection.scopes,
+        expiresAt: connection.expiresAt || undefined,
+        metadata: connection.metadata as Record<string, unknown>,
       };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -382,17 +382,17 @@ export class InstagramOAuthService extends BaseOAuthService {
    * Meta long-lived tokens can be refreshed before they expire
    */
   override async refreshAccessToken(
-    oauthToken: OAuthToken,
-  ): Promise<OAuthToken> {
+    connection: SocialConnection,
+  ): Promise<SocialConnection> {
     try {
-      this.logger.log(`Refreshing access token for user: ${oauthToken.userId}`);
+      this.logger.log(`Refreshing access token for user: ${connection.userId}`);
 
       // Meta tokens are refreshed by exchanging the current long-lived token
       const params = new URLSearchParams({
         grant_type: 'fb_exchange_token',
         client_id: this.config.clientId,
         client_secret: this.config.clientSecret,
-        fb_exchange_token: oauthToken.accessToken,
+        fb_exchange_token: connection.accessToken,
       });
 
       const response = await fetch(
@@ -408,18 +408,18 @@ export class InstagramOAuthService extends BaseOAuthService {
 
       const tokenData = (await response.json()) as OAuthTokenResponse;
 
-      // Update token
+      // Update connection
       const now = new Date();
-      oauthToken.accessToken = tokenData.access_token;
-      oauthToken.expiresAt = tokenData.expires_in
+      connection.accessToken = tokenData.access_token;
+      connection.expiresAt = tokenData.expires_in
         ? new Date(now.getTime() + tokenData.expires_in * 1000)
-        : oauthToken.expiresAt;
+        : connection.expiresAt;
 
-      await this.oauthTokenRepository.save(oauthToken);
+      await this.socialConnectionRepository.save(connection);
 
       this.logger.log('Access token refreshed successfully');
 
-      return oauthToken;
+      return connection;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       const errorStack = getErrorStack(error);
@@ -435,29 +435,31 @@ export class InstagramOAuthService extends BaseOAuthService {
    * Get Instagram Business Account ID for a user
    */
   async getInstagramUserId(userId: string): Promise<string | null> {
-    const token = await this.getToken(userId);
-    if (!token || !token.platformUserId) {
+    const connection = await this.getConnection(userId);
+    if (!connection || !connection.platformUserId) {
       return null;
     }
-    return token.platformUserId;
+    return connection.platformUserId;
   }
 
   /**
    * Get page access token (needed for publishing)
    */
   async getPageAccessToken(userId: string): Promise<string | null> {
-    const token = await this.getToken(userId);
-    if (!token || !token.metadata) {
+    const connection = await this.getConnection(userId);
+    if (!connection || !connection.metadata) {
       return null;
     }
-    return (token.metadata as Record<string, string>).pageAccessToken || null;
+    return (
+      (connection.metadata as Record<string, string>).pageAccessToken || null
+    );
   }
 
   /**
    * Get access token for API calls (convenience method)
    */
   async getAccessToken(userId: string): Promise<string | null> {
-    const token = await this.getToken(userId);
-    return token?.accessToken || null;
+    const connection = await this.getConnection(userId);
+    return connection?.accessToken || null;
   }
 }

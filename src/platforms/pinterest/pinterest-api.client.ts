@@ -37,12 +37,10 @@ export class PinterestApiClient {
   private loadConfig(): PinterestConfig {
     const appId = this.configService.get<string>('PINTEREST_APP_ID') || '';
     const appSecret = this.configService.get<string>('PINTEREST_APP_SECRET');
-    const boardId = this.configService.get<string>('PINTEREST_BOARD_ID');
 
     return {
       appId,
       appSecret,
-      boardId,
     };
   }
 
@@ -54,14 +52,6 @@ export class PinterestApiClient {
       this.logger.warn(
         'PINTEREST_APP_ID is not set. This may be required for some API operations.',
       );
-    }
-
-    if (!this.config.boardId) {
-      this.logger.warn(
-        'PINTEREST_BOARD_ID is not set. Board ID will need to be provided for each pin.',
-      );
-    } else {
-      this.logger.log('Pinterest API client initialized successfully');
     }
   }
 

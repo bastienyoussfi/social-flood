@@ -161,12 +161,12 @@ export class YouTubeOAuthController {
       const statusResponse = await this.oauthService.getStatus(userId);
 
       // Add channel info to response
-      const token = await this.oauthService.getToken(userId);
-      const channelId = token?.metadata
-        ? (token.metadata as Record<string, string>).channelId
+      const connection = await this.oauthService.getConnection(userId);
+      const channelId = connection?.metadata
+        ? (connection.metadata as Record<string, string>).channelId
         : undefined;
-      const channelTitle = token?.metadata
-        ? (token.metadata as Record<string, string>).channelTitle
+      const channelTitle = connection?.metadata
+        ? (connection.metadata as Record<string, string>).channelTitle
         : undefined;
 
       res.status(HttpStatus.OK).json({
@@ -194,7 +194,7 @@ export class YouTubeOAuthController {
   @Get('users')
   async listAuthenticatedUsers(@Res() res: Response): Promise<void> {
     try {
-      const users = await this.oauthService.getAllAuthenticatedUsers();
+      const users = await this.oauthService.getAllConnections();
 
       res.status(HttpStatus.OK).json({
         count: users.length,
@@ -239,7 +239,7 @@ export class YouTubeOAuthController {
     @Res() res: Response,
   ): Promise<void> {
     try {
-      await this.oauthService.revokeToken(userId);
+      await this.oauthService.revokeAllConnections(userId);
 
       this.logger.log(`Disconnected YouTube for user: ${userId}`);
 

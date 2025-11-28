@@ -177,7 +177,7 @@ export class PinterestOAuthController {
   @Get('users')
   async listAuthenticatedUsers(@Res() res: Response): Promise<void> {
     try {
-      const users = await this.oauthService.getAllAuthenticatedUsers();
+      const users = await this.oauthService.getAllConnections();
 
       res.status(HttpStatus.OK).json({
         count: users.length,
@@ -216,7 +216,7 @@ export class PinterestOAuthController {
     @Res() res: Response,
   ): Promise<void> {
     try {
-      await this.oauthService.revokeToken(userId);
+      await this.oauthService.revokeAllConnections(userId);
 
       this.logger.log(`Disconnected Pinterest for user: ${userId}`);
 

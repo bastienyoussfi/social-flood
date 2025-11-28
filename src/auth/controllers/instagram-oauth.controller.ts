@@ -165,8 +165,10 @@ export class InstagramOAuthController {
       const statusResponse = await this.oauthService.getStatus(userId);
 
       // Add Instagram-specific info to response
-      const token = await this.oauthService.getToken(userId);
-      const metadata = token?.metadata as Record<string, string> | undefined;
+      const connection = await this.oauthService.getConnection(userId);
+      const metadata = connection?.metadata as
+        | Record<string, string>
+        | undefined;
 
       res.status(HttpStatus.OK).json({
         ...statusResponse,
@@ -194,7 +196,7 @@ export class InstagramOAuthController {
   @Get('users')
   async listAuthenticatedUsers(@Res() res: Response): Promise<void> {
     try {
-      const users = await this.oauthService.getAllAuthenticatedUsers();
+      const users = await this.oauthService.getAllConnections();
 
       res.status(HttpStatus.OK).json({
         count: users.length,
@@ -239,7 +241,7 @@ export class InstagramOAuthController {
     @Res() res: Response,
   ): Promise<void> {
     try {
-      await this.oauthService.revokeToken(userId);
+      await this.oauthService.revokeAllConnections(userId);
 
       this.logger.log(`Disconnected Instagram for user: ${userId}`);
 

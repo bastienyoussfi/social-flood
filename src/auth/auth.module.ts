@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { OAuthToken } from '../database/entities';
+import { SocialConnection } from '../database/entities';
 
 // State Manager
 import { OAuthStateManager } from './utils/state-manager';
@@ -41,7 +41,7 @@ import { InstagramOAuthController } from './controllers/instagram-oauth.controll
  * - YouTube (Google OAuth 2.0)
  */
 @Module({
-  imports: [ConfigModule, TypeOrmModule.forFeature([OAuthToken])],
+  imports: [ConfigModule, TypeOrmModule.forFeature([SocialConnection])],
   controllers: [
     TwitterOAuthController,
     TikTokOAuthController,

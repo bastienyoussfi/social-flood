@@ -8,29 +8,36 @@ import {
 } from 'typeorm';
 
 /**
- * OAuth Token Entity
- * Stores OAuth 2.0 access tokens and refresh tokens for multiple users and platforms
- * Supports Pinterest, TikTok, LinkedIn, and other OAuth-based platforms
+ * Social Connection Entity
+ * Stores OAuth 2.0 tokens for social media platform connections
+ * Supports multiple accounts per platform per user
  */
-@Entity('oauth_tokens')
-@Index(['userId', 'platform'], { unique: true })
-export class OAuthToken {
+@Entity('social_connections')
+@Index(['userId', 'platform', 'platformUserId'], { unique: true })
+export class SocialConnection {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   /**
-   * User identifier (can be email, username, or any unique user ID)
-   * For multi-user applications
+   * User ID from better-auth user table
    */
   @Column({ name: 'user_id' })
+  @Index()
   userId: string;
 
   /**
-   * Platform name (pinterest, tiktok, linkedin, etc.)
+   * Platform name (linkedin, twitter, tiktok, pinterest, instagram, bluesky)
    */
   @Column()
   @Index()
   platform: string;
+
+  /**
+   * User-friendly display name for this connection
+   * e.g., "@johndoe" or "John Doe - Personal"
+   */
+  @Column({ type: 'varchar', name: 'display_name', nullable: true })
+  displayName: string | null;
 
   /**
    * OAuth access token
@@ -70,7 +77,7 @@ export class OAuthToken {
   platformUserId: string | null;
 
   /**
-   * Platform-specific username or display name
+   * Platform-specific username
    */
   @Column({ type: 'varchar', name: 'platform_username', nullable: true })
   platformUsername: string | null;
@@ -79,12 +86,12 @@ export class OAuthToken {
    * Additional metadata (JSON)
    */
   @Column('simple-json', { nullable: true })
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
 
   /**
-   * Whether this token is currently active
+   * Whether this connection is currently active
    */
-  @Column({ default: true })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })

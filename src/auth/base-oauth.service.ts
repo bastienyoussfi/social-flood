@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { OAuthToken } from '../database/entities';
+import { SocialConnection } from '../database/entities';
 import { OAuthStateManager } from './utils/state-manager';
 import {
   OAuthPlatform,
@@ -26,8 +26,8 @@ export abstract class BaseOAuthService {
   protected abstract readonly config: OAuthConfig;
 
   constructor(
-    @InjectRepository(OAuthToken)
-    protected readonly oauthTokenRepository: Repository<OAuthToken>,
+    @InjectRepository(SocialConnection)
+    protected readonly socialConnectionRepository: Repository<SocialConnection>,
     protected readonly stateManager: OAuthStateManager,
   ) {
     this.logger = new Logger(this.constructor.name);
@@ -129,12 +129,13 @@ export abstract class BaseOAuthService {
     tokenResponse: OAuthTokenResponse,
     userInfo: OAuthUserInfo,
     refreshExpiresIn?: number,
-  ): Promise<OAuthToken> {
-    // Check if token already exists
-    let oauthToken = await this.oauthTokenRepository.findOne({
+  ): Promise<SocialConnection> {
+    // Check if connection already exists for this platform user
+    let connection = await this.socialConnectionRepository.findOne({
       where: {
         userId,
         platform: this.platform,
+        platformUserId: userInfo.id,
       },
     });
 
@@ -151,23 +152,27 @@ export abstract class BaseOAuthService {
       ? tokenResponse.scope.split(/[\s,]+/)
       : this.config.scopes;
 
-    if (oauthToken) {
-      // Update existing token
-      oauthToken.accessToken = tokenResponse.access_token;
-      oauthToken.refreshToken =
-        tokenResponse.refresh_token || oauthToken.refreshToken;
-      oauthToken.expiresAt = expiresAt;
-      oauthToken.refreshExpiresAt = refreshExpiresAt;
-      oauthToken.scopes = scopes;
-      oauthToken.platformUserId = userInfo.id;
-      oauthToken.platformUsername = userInfo.username || null;
-      oauthToken.metadata = userInfo.metadata || oauthToken.metadata;
-      oauthToken.isActive = true;
+    const displayName =
+      userInfo.displayName || userInfo.username || userInfo.id;
+
+    if (connection) {
+      // Update existing connection
+      connection.accessToken = tokenResponse.access_token;
+      connection.refreshToken =
+        tokenResponse.refresh_token || connection.refreshToken;
+      connection.expiresAt = expiresAt;
+      connection.refreshExpiresAt = refreshExpiresAt;
+      connection.scopes = scopes;
+      connection.platformUsername = userInfo.username || null;
+      connection.displayName = displayName;
+      connection.metadata = userInfo.metadata || connection.metadata;
+      connection.isActive = true;
     } else {
-      // Create new token
-      oauthToken = this.oauthTokenRepository.create({
+      // Create new connection
+      connection = this.socialConnectionRepository.create({
         userId,
         platform: this.platform,
+        displayName,
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token || null,
         expiresAt,
@@ -180,24 +185,26 @@ export abstract class BaseOAuthService {
       });
     }
 
-    return await this.oauthTokenRepository.save(oauthToken);
+    return await this.socialConnectionRepository.save(connection);
   }
 
   /**
    * Refresh access token
    * Override for platform-specific refresh logic
    */
-  async refreshAccessToken(oauthToken: OAuthToken): Promise<OAuthToken> {
+  async refreshAccessToken(
+    connection: SocialConnection,
+  ): Promise<SocialConnection> {
     try {
-      this.logger.log(`Refreshing access token for user: ${oauthToken.userId}`);
+      this.logger.log(`Refreshing access token for user: ${connection.userId}`);
 
-      if (!oauthToken.refreshToken) {
+      if (!connection.refreshToken) {
         throw new Error(
           'No refresh token available. User needs to re-authenticate.',
         );
       }
 
-      if (oauthToken.isRefreshTokenExpired()) {
+      if (connection.isRefreshTokenExpired()) {
         throw new Error(
           'Refresh token expired. User needs to re-authenticate.',
         );
@@ -205,7 +212,7 @@ export abstract class BaseOAuthService {
 
       const params = new URLSearchParams({
         grant_type: 'refresh_token',
-        refresh_token: oauthToken.refreshToken,
+        refresh_token: connection.refreshToken,
         client_id: this.config.clientId,
         client_secret: this.config.clientSecret,
       });
@@ -229,29 +236,29 @@ export abstract class BaseOAuthService {
 
       // Update tokens
       const now = new Date();
-      oauthToken.accessToken = tokenData.access_token;
+      connection.accessToken = tokenData.access_token;
       if (tokenData.refresh_token) {
-        oauthToken.refreshToken = tokenData.refresh_token;
+        connection.refreshToken = tokenData.refresh_token;
       }
-      oauthToken.expiresAt = tokenData.expires_in
+      connection.expiresAt = tokenData.expires_in
         ? new Date(now.getTime() + tokenData.expires_in * 1000)
-        : oauthToken.expiresAt;
+        : connection.expiresAt;
 
       if (tokenData.refresh_expires_in) {
-        oauthToken.refreshExpiresAt = new Date(
+        connection.refreshExpiresAt = new Date(
           now.getTime() + tokenData.refresh_expires_in * 1000,
         );
       }
 
       if (tokenData.scope) {
-        oauthToken.scopes = tokenData.scope.split(/[\s,]+/);
+        connection.scopes = tokenData.scope.split(/[\s,]+/);
       }
 
-      await this.oauthTokenRepository.save(oauthToken);
+      await this.socialConnectionRepository.save(connection);
 
       this.logger.log('Access token refreshed successfully');
 
-      return oauthToken;
+      return connection;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       const errorStack = getErrorStack(error);
@@ -265,9 +272,10 @@ export abstract class BaseOAuthService {
 
   /**
    * Get valid access token for a user (refresh if needed)
+   * Returns the first active connection for the platform
    */
   async getValidAccessToken(userId: string): Promise<string> {
-    let oauthToken = await this.oauthTokenRepository.findOne({
+    let connection = await this.socialConnectionRepository.findOne({
       where: {
         userId,
         platform: this.platform,
@@ -275,26 +283,26 @@ export abstract class BaseOAuthService {
       },
     });
 
-    if (!oauthToken) {
+    if (!connection) {
       throw new Error(
         `${this.platform} authentication not found. User needs to authenticate.`,
       );
     }
 
     // Refresh if token is expired or about to expire
-    if (oauthToken.needsRefresh()) {
+    if (connection.needsRefresh()) {
       this.logger.log('Access token expired or expiring soon, refreshing...');
-      oauthToken = await this.refreshAccessToken(oauthToken);
+      connection = await this.refreshAccessToken(connection);
     }
 
-    return oauthToken.accessToken;
+    return connection.accessToken;
   }
 
   /**
-   * Get OAuth token for a user
+   * Get connection for a user (first active connection for platform)
    */
-  async getToken(userId: string): Promise<OAuthToken | null> {
-    const token = await this.oauthTokenRepository.findOne({
+  async getConnection(userId: string): Promise<SocialConnection | null> {
+    const connection = await this.socialConnectionRepository.findOne({
       where: {
         userId,
         platform: this.platform,
@@ -302,34 +310,59 @@ export abstract class BaseOAuthService {
       },
     });
 
-    if (!token) {
+    if (!connection) {
       return null;
     }
 
     // Auto-refresh if expired or expiring soon and refresh token is available
-    if (token.needsRefresh() && token.refreshToken) {
-      this.logger.log(`Token for user ${userId} needs refresh, refreshing...`);
+    if (connection.needsRefresh() && connection.refreshToken) {
+      this.logger.log(
+        `Connection for user ${userId} needs refresh, refreshing...`,
+      );
       try {
-        return await this.refreshAccessToken(token);
+        return await this.refreshAccessToken(connection);
       } catch (error) {
         this.logger.warn(
-          `Failed to refresh token for user ${userId}: ${getErrorMessage(error)}`,
+          `Failed to refresh connection for user ${userId}: ${getErrorMessage(error)}`,
         );
-        // Return the existing token even if refresh failed
-        return token;
+        // Return the existing connection even if refresh failed
+        return connection;
       }
     }
 
-    return token;
+    return connection;
   }
 
   /**
-   * Get OAuth token by platform user ID
+   * Get all connections for a user on this platform
    */
-  async getTokenByPlatformUserId(
+  async getConnectionsForUser(userId: string): Promise<SocialConnection[]> {
+    return this.socialConnectionRepository.find({
+      where: {
+        userId,
+        platform: this.platform,
+        isActive: true,
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Get connection by ID
+   */
+  async getConnectionById(id: string): Promise<SocialConnection | null> {
+    return this.socialConnectionRepository.findOne({
+      where: { id, isActive: true },
+    });
+  }
+
+  /**
+   * Get connection by platform user ID
+   */
+  async getConnectionByPlatformUserId(
     platformUserId: string,
-  ): Promise<OAuthToken | null> {
-    return this.oauthTokenRepository.findOne({
+  ): Promise<SocialConnection | null> {
+    return this.socialConnectionRepository.findOne({
       where: {
         platformUserId,
         platform: this.platform,
@@ -339,10 +372,10 @@ export abstract class BaseOAuthService {
   }
 
   /**
-   * Get all authenticated users for this platform
+   * Get all connections for this platform (all users)
    */
-  async getAllAuthenticatedUsers(): Promise<OAuthToken[]> {
-    return this.oauthTokenRepository.find({
+  async getAllConnections(): Promise<SocialConnection[]> {
+    return this.socialConnectionRepository.find({
       where: { platform: this.platform, isActive: true },
       order: { createdAt: 'DESC' },
     });
@@ -352,53 +385,76 @@ export abstract class BaseOAuthService {
    * Check OAuth connection status
    */
   async getStatus(userId: string): Promise<OAuthStatusResponse> {
-    const token = await this.getToken(userId);
+    const connection = await this.getConnection(userId);
 
     const response: OAuthStatusResponse = {
-      connected: !!token && !token.isExpired(),
+      connected: !!connection && !connection.isExpired(),
       userId,
       platform: this.platform,
     };
 
-    if (token) {
-      response.platformUserId = token.platformUserId || undefined;
-      response.platformUsername = token.platformUsername || undefined;
-      response.scopes = token.scopes;
-      response.expiresAt = token.expiresAt || undefined;
-      response.needsRefresh = token.needsRefresh();
-      response.isExpired = token.isExpired();
+    if (connection) {
+      response.platformUserId = connection.platformUserId || undefined;
+      response.platformUsername = connection.platformUsername || undefined;
+      response.scopes = connection.scopes;
+      response.expiresAt = connection.expiresAt || undefined;
+      response.needsRefresh = connection.needsRefresh();
+      response.isExpired = connection.isExpired();
     }
 
     return response;
   }
 
   /**
-   * Check if user has valid OAuth token
+   * Check if user has valid connection
    */
-  async hasValidToken(userId: string): Promise<boolean> {
-    const token = await this.getToken(userId);
-    return token !== null && !token.isExpired();
+  async hasValidConnection(userId: string): Promise<boolean> {
+    const connection = await this.getConnection(userId);
+    return connection !== null && !connection.isExpired();
   }
 
   /**
-   * Revoke/deactivate OAuth token
+   * Revoke/deactivate a specific connection by ID
    */
-  async revokeToken(userId: string): Promise<void> {
-    await this.oauthTokenRepository.update(
+  async revokeConnection(connectionId: string): Promise<void> {
+    await this.socialConnectionRepository.update(
+      { id: connectionId },
+      { isActive: false },
+    );
+    this.logger.log(`Revoked connection: ${connectionId}`);
+  }
+
+  /**
+   * Revoke all connections for a user on this platform
+   */
+  async revokeAllConnections(userId: string): Promise<void> {
+    await this.socialConnectionRepository.update(
       { userId, platform: this.platform, isActive: true },
       { isActive: false },
     );
-    this.logger.log(`Revoked ${this.platform} auth for user: ${userId}`);
+    this.logger.log(
+      `Revoked all ${this.platform} connections for user: ${userId}`,
+    );
   }
 
   /**
-   * Delete OAuth token completely
+   * Delete a specific connection by ID
    */
-  async deleteToken(userId: string): Promise<void> {
-    await this.oauthTokenRepository.delete({
+  async deleteConnection(connectionId: string): Promise<void> {
+    await this.socialConnectionRepository.delete({ id: connectionId });
+    this.logger.log(`Deleted connection: ${connectionId}`);
+  }
+
+  /**
+   * Delete all connections for a user on this platform
+   */
+  async deleteAllConnections(userId: string): Promise<void> {
+    await this.socialConnectionRepository.delete({
       userId,
       platform: this.platform,
     });
-    this.logger.log(`Deleted ${this.platform} auth for user: ${userId}`);
+    this.logger.log(
+      `Deleted all ${this.platform} connections for user: ${userId}`,
+    );
   }
 }

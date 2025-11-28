@@ -346,7 +346,7 @@ export class LinkedInApiClient {
    * @returns True if user has valid credentials
    */
   async isConfiguredForUser(userId: string): Promise<boolean> {
-    return this.oauthService.hasValidToken(userId);
+    return this.oauthService.hasValidConnection(userId);
   }
 
   /**

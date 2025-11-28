@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { OAuthToken } from '../../database/entities';
+import { SocialConnection } from '../../database/entities';
 import { BaseOAuthService } from '../base-oauth.service';
 import { OAuthStateManager } from '../utils/state-manager';
 import {
@@ -51,12 +51,12 @@ export class TikTokOAuthService extends BaseOAuthService {
   protected readonly config: OAuthConfig;
 
   constructor(
-    @InjectRepository(OAuthToken)
-    oauthTokenRepository: Repository<OAuthToken>,
+    @InjectRepository(SocialConnection)
+    socialConnectionRepository: Repository<SocialConnection>,
     stateManager: OAuthStateManager,
     private readonly configService: ConfigService,
   ) {
-    super(oauthTokenRepository, stateManager);
+    super(socialConnectionRepository, stateManager);
     this.config = this.loadConfig();
 
     if (!this.isConfigured()) {
@@ -135,8 +135,8 @@ export class TikTokOAuthService extends BaseOAuthService {
       // Get user info
       const userInfo = await this.fetchUserInfo(tokenResponse.access_token);
 
-      // Save token with TikTok-specific refresh_expires_in
-      const oauthToken = await this.saveToken(
+      // Save connection with TikTok-specific refresh_expires_in
+      const connection = await this.saveToken(
         userId,
         tokenResponse,
         userInfo,
@@ -153,8 +153,8 @@ export class TikTokOAuthService extends BaseOAuthService {
         platform: this.platform,
         platformUserId: userInfo.id,
         platformUsername: userInfo.displayName,
-        scopes: oauthToken.scopes,
-        expiresAt: oauthToken.expiresAt || undefined,
+        scopes: connection.scopes,
+        expiresAt: connection.expiresAt || undefined,
         metadata: userInfo.metadata,
       };
     } catch (error) {
@@ -200,18 +200,18 @@ export class TikTokOAuthService extends BaseOAuthService {
    * Refresh access token (TikTok-specific)
    */
   override async refreshAccessToken(
-    oauthToken: OAuthToken,
-  ): Promise<OAuthToken> {
+    connection: SocialConnection,
+  ): Promise<SocialConnection> {
     try {
-      this.logger.log(`Refreshing access token for user: ${oauthToken.userId}`);
+      this.logger.log(`Refreshing access token for user: ${connection.userId}`);
 
-      if (!oauthToken.refreshToken) {
+      if (!connection.refreshToken) {
         throw new Error(
           'No refresh token available. User needs to re-authenticate.',
         );
       }
 
-      if (oauthToken.isRefreshTokenExpired()) {
+      if (connection.isRefreshTokenExpired()) {
         throw new Error(
           'Refresh token expired. User needs to re-authenticate.',
         );
@@ -226,7 +226,7 @@ export class TikTokOAuthService extends BaseOAuthService {
           client_key: this.config.clientId,
           client_secret: this.config.clientSecret,
           grant_type: 'refresh_token',
-          refresh_token: oauthToken.refreshToken,
+          refresh_token: connection.refreshToken,
         }),
       });
 
@@ -241,22 +241,22 @@ export class TikTokOAuthService extends BaseOAuthService {
 
       // Update tokens
       const now = new Date();
-      oauthToken.accessToken = tokenData.access_token;
-      oauthToken.refreshToken =
-        tokenData.refresh_token || oauthToken.refreshToken;
-      oauthToken.expiresAt = new Date(
+      connection.accessToken = tokenData.access_token;
+      connection.refreshToken =
+        tokenData.refresh_token || connection.refreshToken;
+      connection.expiresAt = new Date(
         now.getTime() + tokenData.expires_in! * 1000,
       );
-      oauthToken.refreshExpiresAt = new Date(
+      connection.refreshExpiresAt = new Date(
         now.getTime() + tokenData.refresh_expires_in * 1000,
       );
-      oauthToken.scopes = tokenData.scope?.split(',') || oauthToken.scopes;
+      connection.scopes = tokenData.scope?.split(',') || connection.scopes;
 
-      await this.oauthTokenRepository.save(oauthToken);
+      await this.socialConnectionRepository.save(connection);
 
       this.logger.log('Access token refreshed successfully');
 
-      return oauthToken;
+      return connection;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       const errorStack = getErrorStack(error);
@@ -311,20 +311,20 @@ export class TikTokOAuthService extends BaseOAuthService {
   async getValidAccessTokenByTikTokUserId(
     tiktokUserId: string,
   ): Promise<string> {
-    let oauthToken = await this.getTokenByPlatformUserId(tiktokUserId);
+    let connection = await this.getConnectionByPlatformUserId(tiktokUserId);
 
-    if (!oauthToken) {
+    if (!connection) {
       throw new Error(
         'TikTok authentication not found. User needs to authenticate.',
       );
     }
 
     // Refresh if token is expired or about to expire
-    if (oauthToken.needsRefresh()) {
+    if (connection.needsRefresh()) {
       this.logger.log('Access token expired, refreshing...');
-      oauthToken = await this.refreshAccessToken(oauthToken);
+      connection = await this.refreshAccessToken(connection);
     }
 
-    return oauthToken.accessToken;
+    return connection.accessToken;
   }
 }

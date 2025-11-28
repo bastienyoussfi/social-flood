@@ -1,3 +1,3 @@
 export * from './post.entity';
 export * from './platform-post.entity';
-export * from './oauth-token.entity';
+export * from './social-connection.entity';
