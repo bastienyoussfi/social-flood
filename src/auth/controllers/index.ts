@@ -1,0 +1,4 @@
+export * from './twitter-oauth.controller';
+export * from './tiktok-oauth.controller';
+export * from './linkedin-oauth.controller';
+export * from './pinterest-oauth.controller';

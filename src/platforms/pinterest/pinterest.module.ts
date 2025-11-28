@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -8,13 +8,15 @@ import { PinterestProcessor } from './pinterest.processor';
 import { PinterestApiClient } from './pinterest-api.client';
 import { PinterestMediaService } from './pinterest-media.service';
 import { PinterestQueueService } from './pinterest-queue.service';
-import { PinterestOAuthService } from './pinterest-oauth.service';
-import { PinterestOAuthController } from './pinterest-oauth.controller';
-import { PlatformPost, Post, OAuthToken } from '../../database/entities';
+import { PlatformPost, Post } from '../../database/entities';
+import { AuthModule } from '../../auth/auth.module';
 
 /**
  * Pinterest Module
  * Provides complete Pinterest integration with pin posting capabilities
+ *
+ * OAuth authentication is handled by the centralized AuthModule.
+ * This module imports AuthModule to access PinterestOAuthService.
  *
  * Architecture:
  * - PinterestAdapter: Queue interface for posting
@@ -23,18 +25,17 @@ import { PlatformPost, Post, OAuthToken } from '../../database/entities';
  * - PinterestApiClient: Handles Pinterest API v5 communication
  * - PinterestMediaService: Handles media validation
  * - PinterestQueueService: Handles queue events and database updates
- * - PinterestOAuthService: Handles OAuth 2.0 authentication and token management
- * - PinterestOAuthController: OAuth endpoints for user authorization
  */
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([PlatformPost, Post, OAuthToken]),
+    TypeOrmModule.forFeature([PlatformPost, Post]),
     BullModule.registerQueue({
       name: 'pinterest-posts',
     }),
+    forwardRef(() => AuthModule),
   ],
-  controllers: [PinterestOAuthController],
+  controllers: [],
   providers: [
     PinterestApiClient,
     PinterestMediaService,
@@ -42,8 +43,7 @@ import { PlatformPost, Post, OAuthToken } from '../../database/entities';
     PinterestAdapter,
     PinterestProcessor,
     PinterestQueueService,
-    PinterestOAuthService,
   ],
-  exports: [PinterestAdapter, PinterestService, PinterestOAuthService],
+  exports: [PinterestAdapter, PinterestService],
 })
 export class PinterestModule {}

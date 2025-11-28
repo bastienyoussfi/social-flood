@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LinkedInMediaService } from './linkedin-media.service';
 import { LinkedInApiClient } from './linkedin-api.client';
-import { LinkedInOAuthService } from './linkedin-oauth.service';
+import { LinkedInOAuthService } from '../../auth/services/linkedin-oauth.service';
 import { MediaAttachment } from '../../common/interfaces';
 
 describe('LinkedInMediaService', () => {

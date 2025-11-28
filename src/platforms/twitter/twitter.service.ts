@@ -4,7 +4,7 @@ import { TwitterApiClient } from './twitter-api.client';
 import { TwitterMediaService } from './twitter-media.service';
 import { TwitterPostResult } from './interfaces';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
-import { TwitterAuthService } from '../../auth/twitter-auth.service';
+import { TwitterOAuthService } from '../../auth/services/twitter-oauth.service';
 
 /**
  * Twitter Service
@@ -18,8 +18,8 @@ export class TwitterService {
   constructor(
     private readonly apiClient: TwitterApiClient,
     private readonly mediaService: TwitterMediaService,
-    @Inject(forwardRef(() => TwitterAuthService))
-    private readonly twitterAuthService: TwitterAuthService,
+    @Inject(forwardRef(() => TwitterOAuthService))
+    private readonly twitterOAuthService: TwitterOAuthService,
   ) {}
 
   /**
@@ -130,9 +130,24 @@ export class TwitterService {
     platformPostId: string;
     url: string;
   }> {
-    // Get valid access token for the user
-    const accessToken =
-      await this.twitterAuthService.getValidAccessToken(twitterUserId);
+    // Get the OAuth token by platform user ID
+    const oauthToken =
+      await this.twitterOAuthService.getTokenByPlatformUserId(twitterUserId);
+
+    if (!oauthToken) {
+      throw new Error(
+        `Twitter authentication not found for user ${twitterUserId}. Please authenticate first.`,
+      );
+    }
+
+    // Refresh if needed
+    let accessToken = oauthToken.accessToken;
+    if (oauthToken.needsRefresh()) {
+      this.logger.log('Access token needs refresh, refreshing...');
+      const refreshedToken =
+        await this.twitterOAuthService.refreshAccessToken(oauthToken);
+      accessToken = refreshedToken.accessToken;
+    }
 
     // Validate content
     this.validateContent(content);

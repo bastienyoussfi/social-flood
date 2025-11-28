@@ -1,27 +1,30 @@
 import {
   Controller,
   Get,
+  Delete,
   Query,
+  Param,
   Res,
-  HttpStatus,
   Logger,
   BadRequestException,
+  HttpStatus,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { LinkedInOAuthService } from './linkedin-oauth.service';
+import { LinkedInOAuthService } from '../services/linkedin-oauth.service';
 import { getErrorMessage } from '../../common/utils/error.utils';
 
 /**
  * LinkedIn OAuth Controller
- * Handles OAuth 2.0 authorization flow endpoints
+ * Handles OAuth 2.0 flow endpoints
  *
  * Endpoints:
- * - GET /auth/linkedin/login - Initiates OAuth flow
- * - GET /auth/linkedin/callback - Handles OAuth callback
- * - GET /auth/linkedin/status - Check connection status
- * - GET /auth/linkedin/disconnect - Revoke token
+ * - GET /api/auth/linkedin/login?userId=xxx - Initiate OAuth flow
+ * - GET /api/auth/linkedin/callback - Handle OAuth callback
+ * - GET /api/auth/linkedin/status?userId=xxx - Check connection status
+ * - DELETE /api/auth/linkedin/:userId - Disconnect user
+ * - GET /api/auth/linkedin/users - List all authenticated users (admin)
  */
-@Controller('auth/linkedin')
+@Controller('api/auth/linkedin')
 export class LinkedInOAuthController {
   private readonly logger = new Logger(LinkedInOAuthController.name);
 
@@ -31,10 +34,7 @@ export class LinkedInOAuthController {
    * Initiate LinkedIn OAuth flow
    * Redirects user to LinkedIn authorization page
    *
-   * Query parameters:
-   * - userId: Unique identifier for the user (required)
-   *
-   * Example: GET /auth/linkedin/login?userId=user@example.com
+   * GET /api/auth/linkedin/login?userId=xxx
    */
   @Get('login')
   login(@Query('userId') userId: string, @Res() res: Response) {
@@ -45,23 +45,27 @@ export class LinkedInOAuthController {
         );
       }
 
+      if (!this.oauthService.isConfigured()) {
+        throw new BadRequestException(
+          'LinkedIn OAuth is not configured. Please set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.',
+        );
+      }
+
       this.logger.log(`Initiating OAuth flow for user: ${userId}`);
 
-      // Generate authorization URL with state parameter
-      const authUrl = this.oauthService.getAuthorizationUrl(userId);
+      const { url } = this.oauthService.getAuthorizationUrl(userId);
 
-      this.logger.log(`Redirecting to LinkedIn authorization URL`);
+      this.logger.log('Redirecting user to LinkedIn authorization page');
 
-      // Redirect user to LinkedIn
-      res.redirect(authUrl);
+      return res.redirect(url);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       this.logger.error(`OAuth login failed: ${errorMessage}`);
 
-      // Send error response
       res.status(HttpStatus.BAD_REQUEST).json({
         error: 'OAuth login failed',
         message: errorMessage,
+        platform: 'linkedin',
       });
     }
   }
@@ -70,11 +74,7 @@ export class LinkedInOAuthController {
    * Handle LinkedIn OAuth callback
    * Called by LinkedIn after user authorizes the app
    *
-   * Query parameters:
-   * - code: Authorization code from LinkedIn
-   * - state: State parameter for CSRF protection
-   *
-   * Example: GET /auth/linkedin/callback?code=ABC123&state=XYZ789
+   * GET /api/auth/linkedin/callback?code=xxx&state=xxx
    */
   @Get('callback')
   async callback(
@@ -91,6 +91,7 @@ export class LinkedInOAuthController {
         res.status(HttpStatus.BAD_REQUEST).json({
           error: 'OAuth authorization failed',
           message: errorDescription || error,
+          platform: 'linkedin',
         });
         return;
       }
@@ -103,58 +104,45 @@ export class LinkedInOAuthController {
         throw new BadRequestException('State parameter is missing');
       }
 
-      // Validate state parameter
-      const stateData = this.oauthService.validateState(state);
-      if (!stateData) {
-        throw new BadRequestException('Invalid or expired state parameter');
-      }
+      this.logger.log('Processing OAuth callback...');
 
-      const { userId } = stateData;
+      const result = await this.oauthService.exchangeCodeForToken(code, state);
 
-      this.logger.log(`Processing OAuth callback for user: ${userId}`);
-
-      // Exchange authorization code for access token
-      const oauthToken = await this.oauthService.exchangeCodeForToken(
-        code,
-        userId,
+      this.logger.log(
+        `Successfully authenticated LinkedIn user: ${result.platformUsername}`,
       );
 
-      this.logger.log(`Successfully authorized LinkedIn for user: ${userId}`);
-
-      // Success response
+      // Return JSON response
       res.status(HttpStatus.OK).json({
         success: true,
         message: 'LinkedIn account connected successfully',
         data: {
-          userId: oauthToken.userId,
-          platform: oauthToken.platform,
-          scopes: oauthToken.scopes,
-          expiresAt: oauthToken.expiresAt,
-          platformUserId: oauthToken.platformUserId,
-          platformUsername: oauthToken.platformUsername,
-          personUrn: (oauthToken.metadata as Record<string, string>)?.personUrn,
+          userId: result.userId,
+          platform: result.platform,
+          platformUserId: result.platformUserId,
+          platformUsername: result.platformUsername,
+          scopes: result.scopes,
+          expiresAt: result.expiresAt,
+          personUrn: (result.metadata as Record<string, string> | undefined)
+            ?.personUrn,
         },
       });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       this.logger.error(`OAuth callback failed: ${errorMessage}`);
 
-      // Send error response
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'OAuth callback failed',
         message: errorMessage,
+        platform: 'linkedin',
       });
     }
   }
 
   /**
    * Check OAuth connection status
-   * Returns whether user has valid LinkedIn token
    *
-   * Query parameters:
-   * - userId: Unique identifier for the user (required)
-   *
-   * Example: GET /auth/linkedin/status?userId=user@example.com
+   * GET /api/auth/linkedin/status?userId=xxx
    */
   @Get('status')
   async status(
@@ -168,22 +156,17 @@ export class LinkedInOAuthController {
         );
       }
 
-      const hasValidToken = await this.oauthService.hasValidToken(userId);
-      const token = hasValidToken
-        ? await this.oauthService.getToken(userId)
-        : null;
+      const statusResponse = await this.oauthService.getStatus(userId);
+
+      // Add person URN to response
+      const token = await this.oauthService.getToken(userId);
+      const personUrn = token?.metadata
+        ? (token.metadata as Record<string, string>).personUrn
+        : undefined;
 
       res.status(HttpStatus.OK).json({
-        connected: hasValidToken,
-        userId,
-        platform: 'linkedin',
-        ...(token && {
-          scopes: token.scopes,
-          expiresAt: token.expiresAt,
-          platformUserId: token.platformUserId,
-          platformUsername: token.platformUsername,
-          personUrn: (token.metadata as Record<string, string>)?.personUrn,
-        }),
+        ...statusResponse,
+        personUrn,
       });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -192,31 +175,61 @@ export class LinkedInOAuthController {
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'Status check failed',
         message: errorMessage,
+        platform: 'linkedin',
+      });
+    }
+  }
+
+  /**
+   * List all authenticated LinkedIn users (admin endpoint)
+   *
+   * GET /api/auth/linkedin/users
+   */
+  @Get('users')
+  async listAuthenticatedUsers(@Res() res: Response): Promise<void> {
+    try {
+      const users = await this.oauthService.getAllAuthenticatedUsers();
+
+      res.status(HttpStatus.OK).json({
+        count: users.length,
+        platform: 'linkedin',
+        users: users.map((user) => ({
+          userId: user.userId,
+          platformUserId: user.platformUserId,
+          platformUsername: user.platformUsername,
+          personUrn: user.metadata
+            ? (user.metadata as Record<string, string>).personUrn
+            : undefined,
+          scopes: user.scopes,
+          expiresAt: user.expiresAt,
+          createdAt: user.createdAt,
+          isExpired: user.isExpired(),
+          needsRefresh: user.needsRefresh(),
+        })),
+      });
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      this.logger.error(`Failed to list users: ${errorMessage}`);
+
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to list users',
+        message: errorMessage,
+        platform: 'linkedin',
       });
     }
   }
 
   /**
    * Disconnect LinkedIn account
-   * Revokes OAuth token for user
    *
-   * Query parameters:
-   * - userId: Unique identifier for the user (required)
-   *
-   * Example: GET /auth/linkedin/disconnect?userId=user@example.com
+   * DELETE /api/auth/linkedin/:userId
    */
-  @Get('disconnect')
+  @Delete(':userId')
   async disconnect(
-    @Query('userId') userId: string,
+    @Param('userId') userId: string,
     @Res() res: Response,
   ): Promise<void> {
     try {
-      if (!userId) {
-        throw new BadRequestException(
-          'userId query parameter is required. Example: ?userId=user@example.com',
-        );
-      }
-
       await this.oauthService.revokeToken(userId);
 
       this.logger.log(`Disconnected LinkedIn for user: ${userId}`);
@@ -224,6 +237,7 @@ export class LinkedInOAuthController {
       res.status(HttpStatus.OK).json({
         success: true,
         message: 'LinkedIn account disconnected successfully',
+        platform: 'linkedin',
       });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -232,6 +246,7 @@ export class LinkedInOAuthController {
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'Disconnect failed',
         message: errorMessage,
+        platform: 'linkedin',
       });
     }
   }

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -8,12 +8,15 @@ import { TikTokProcessor } from './tiktok.processor';
 import { TikTokApiClient } from './tiktok-api.client';
 import { TikTokMediaService } from './tiktok-media.service';
 import { TikTokQueueService } from './tiktok-queue.service';
-import { PlatformPost, Post, TikTokAuth } from '../../database/entities';
+import { PlatformPost, Post } from '../../database/entities';
 import { AuthModule } from '../../auth/auth.module';
 
 /**
  * TikTok Module
  * Provides complete TikTok integration with video posting capabilities
+ *
+ * OAuth authentication is handled by the centralized AuthModule.
+ * This module imports AuthModule to access TikTokOAuthService.
  *
  * Architecture:
  * - TikTokAdapter: Queue interface for posting
@@ -26,11 +29,11 @@ import { AuthModule } from '../../auth/auth.module';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([PlatformPost, Post, TikTokAuth]),
+    TypeOrmModule.forFeature([PlatformPost, Post]),
     BullModule.registerQueue({
       name: 'tiktok-posts',
     }),
-    AuthModule,
+    forwardRef(() => AuthModule),
   ],
   providers: [
     TikTokApiClient,

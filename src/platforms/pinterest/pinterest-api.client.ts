@@ -9,7 +9,7 @@ import {
   PINTEREST_API_BASE_URL,
 } from './interfaces';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
-import { PinterestOAuthService } from './pinterest-oauth.service';
+import { PinterestOAuthService } from '../../auth/services/pinterest-oauth.service';
 
 /**
  * Pinterest API Client

@@ -1,25 +1,30 @@
 import {
   Controller,
   Get,
+  Delete,
   Query,
+  Param,
   Res,
-  HttpStatus,
   Logger,
   BadRequestException,
+  HttpStatus,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { PinterestOAuthService } from './pinterest-oauth.service';
+import { PinterestOAuthService } from '../services/pinterest-oauth.service';
 import { getErrorMessage } from '../../common/utils/error.utils';
 
 /**
  * Pinterest OAuth Controller
- * Handles OAuth 2.0 authorization flow endpoints
+ * Handles OAuth 2.0 flow endpoints
  *
  * Endpoints:
- * - GET /auth/pinterest/login - Initiates OAuth flow
- * - GET /auth/pinterest/callback - Handles OAuth callback
+ * - GET /api/auth/pinterest/login?userId=xxx - Initiate OAuth flow
+ * - GET /api/auth/pinterest/callback - Handle OAuth callback
+ * - GET /api/auth/pinterest/status?userId=xxx - Check connection status
+ * - DELETE /api/auth/pinterest/:userId - Disconnect user
+ * - GET /api/auth/pinterest/users - List all authenticated users (admin)
  */
-@Controller('auth/pinterest')
+@Controller('api/auth/pinterest')
 export class PinterestOAuthController {
   private readonly logger = new Logger(PinterestOAuthController.name);
 
@@ -29,10 +34,7 @@ export class PinterestOAuthController {
    * Initiate Pinterest OAuth flow
    * Redirects user to Pinterest authorization page
    *
-   * Query parameters:
-   * - userId: Unique identifier for the user (required)
-   *
-   * Example: GET /auth/pinterest/login?userId=user@example.com
+   * GET /api/auth/pinterest/login?userId=xxx
    */
   @Get('login')
   login(@Query('userId') userId: string, @Res() res: Response) {
@@ -43,23 +45,27 @@ export class PinterestOAuthController {
         );
       }
 
+      if (!this.oauthService.isConfigured()) {
+        throw new BadRequestException(
+          'Pinterest OAuth is not configured. Please set PINTEREST_APP_ID and PINTEREST_APP_SECRET.',
+        );
+      }
+
       this.logger.log(`Initiating OAuth flow for user: ${userId}`);
 
-      // Generate authorization URL with state parameter
-      const authUrl = this.oauthService.getAuthorizationUrl(userId);
+      const { url } = this.oauthService.getAuthorizationUrl(userId);
 
-      this.logger.log(`Redirecting to Pinterest authorization URL`);
+      this.logger.log('Redirecting user to Pinterest authorization page');
 
-      // Redirect user to Pinterest
-      res.redirect(authUrl);
+      return res.redirect(url);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       this.logger.error(`OAuth login failed: ${errorMessage}`);
 
-      // Send error response
       res.status(HttpStatus.BAD_REQUEST).json({
         error: 'OAuth login failed',
         message: errorMessage,
+        platform: 'pinterest',
       });
     }
   }
@@ -68,11 +74,7 @@ export class PinterestOAuthController {
    * Handle Pinterest OAuth callback
    * Called by Pinterest after user authorizes the app
    *
-   * Query parameters:
-   * - code: Authorization code from Pinterest
-   * - state: State parameter for CSRF protection
-   *
-   * Example: GET /auth/pinterest/callback?code=ABC123&state=XYZ789
+   * GET /api/auth/pinterest/callback?code=xxx&state=xxx
    */
   @Get('callback')
   async callback(
@@ -89,7 +91,9 @@ export class PinterestOAuthController {
         res.status(HttpStatus.BAD_REQUEST).json({
           error: 'OAuth authorization failed',
           message: errorDescription || error,
+          platform: 'pinterest',
         });
+        return;
       }
 
       if (!code) {
@@ -100,57 +104,43 @@ export class PinterestOAuthController {
         throw new BadRequestException('State parameter is missing');
       }
 
-      // Validate state parameter
-      const stateData = this.oauthService.validateState(state);
-      if (!stateData) {
-        throw new BadRequestException('Invalid or expired state parameter');
-      }
+      this.logger.log('Processing OAuth callback...');
 
-      const { userId } = stateData;
+      const result = await this.oauthService.exchangeCodeForToken(code, state);
 
-      this.logger.log(`Processing OAuth callback for user: ${userId}`);
-
-      // Exchange authorization code for access token
-      const oauthToken = await this.oauthService.exchangeCodeForToken(
-        code,
-        userId,
+      this.logger.log(
+        `Successfully authenticated Pinterest user: ${result.platformUsername}`,
       );
 
-      this.logger.log(`Successfully authorized Pinterest for user: ${userId}`);
-
-      // Success response
+      // Return JSON response
       res.status(HttpStatus.OK).json({
         success: true,
         message: 'Pinterest account connected successfully',
         data: {
-          userId: oauthToken.userId,
-          platform: oauthToken.platform,
-          scopes: oauthToken.scopes,
-          expiresAt: oauthToken.expiresAt,
-          platformUserId: oauthToken.platformUserId,
-          platformUsername: oauthToken.platformUsername,
+          userId: result.userId,
+          platform: result.platform,
+          platformUserId: result.platformUserId,
+          platformUsername: result.platformUsername,
+          scopes: result.scopes,
+          expiresAt: result.expiresAt,
         },
       });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       this.logger.error(`OAuth callback failed: ${errorMessage}`);
 
-      // Send error response
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'OAuth callback failed',
         message: errorMessage,
+        platform: 'pinterest',
       });
     }
   }
 
   /**
    * Check OAuth connection status
-   * Returns whether user has valid Pinterest token
    *
-   * Query parameters:
-   * - userId: Unique identifier for the user (required)
-   *
-   * Example: GET /auth/pinterest/status?userId=user@example.com
+   * GET /api/auth/pinterest/status?userId=xxx
    */
   @Get('status')
   async status(
@@ -164,22 +154,9 @@ export class PinterestOAuthController {
         );
       }
 
-      const hasValidToken = await this.oauthService.hasValidToken(userId);
-      const token = hasValidToken
-        ? await this.oauthService.getToken(userId)
-        : null;
+      const statusResponse = await this.oauthService.getStatus(userId);
 
-      res.status(HttpStatus.OK).json({
-        connected: hasValidToken,
-        userId,
-        platform: 'pinterest',
-        ...(token && {
-          scopes: token.scopes,
-          expiresAt: token.expiresAt,
-          platformUserId: token.platformUserId,
-          platformUsername: token.platformUsername,
-        }),
-      });
+      res.status(HttpStatus.OK).json(statusResponse);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       this.logger.error(`Status check failed: ${errorMessage}`);
@@ -187,31 +164,58 @@ export class PinterestOAuthController {
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'Status check failed',
         message: errorMessage,
+        platform: 'pinterest',
+      });
+    }
+  }
+
+  /**
+   * List all authenticated Pinterest users (admin endpoint)
+   *
+   * GET /api/auth/pinterest/users
+   */
+  @Get('users')
+  async listAuthenticatedUsers(@Res() res: Response): Promise<void> {
+    try {
+      const users = await this.oauthService.getAllAuthenticatedUsers();
+
+      res.status(HttpStatus.OK).json({
+        count: users.length,
+        platform: 'pinterest',
+        users: users.map((user) => ({
+          userId: user.userId,
+          platformUserId: user.platformUserId,
+          platformUsername: user.platformUsername,
+          scopes: user.scopes,
+          expiresAt: user.expiresAt,
+          createdAt: user.createdAt,
+          isExpired: user.isExpired(),
+          needsRefresh: user.needsRefresh(),
+        })),
+      });
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      this.logger.error(`Failed to list users: ${errorMessage}`);
+
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to list users',
+        message: errorMessage,
+        platform: 'pinterest',
       });
     }
   }
 
   /**
    * Disconnect Pinterest account
-   * Revokes OAuth token for user
    *
-   * Query parameters:
-   * - userId: Unique identifier for the user (required)
-   *
-   * Example: GET /auth/pinterest/disconnect?userId=user@example.com
+   * DELETE /api/auth/pinterest/:userId
    */
-  @Get('disconnect')
+  @Delete(':userId')
   async disconnect(
-    @Query('userId') userId: string,
+    @Param('userId') userId: string,
     @Res() res: Response,
   ): Promise<void> {
     try {
-      if (!userId) {
-        throw new BadRequestException(
-          'userId query parameter is required. Example: ?userId=user@example.com',
-        );
-      }
-
       await this.oauthService.revokeToken(userId);
 
       this.logger.log(`Disconnected Pinterest for user: ${userId}`);
@@ -219,6 +223,7 @@ export class PinterestOAuthController {
       res.status(HttpStatus.OK).json({
         success: true,
         message: 'Pinterest account disconnected successfully',
+        platform: 'pinterest',
       });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -227,6 +232,7 @@ export class PinterestOAuthController {
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'Disconnect failed',
         message: errorMessage,
+        platform: 'pinterest',
       });
     }
   }

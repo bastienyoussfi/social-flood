@@ -12,7 +12,7 @@ import {
   LINKEDIN_PROTOCOL_VERSION,
 } from './interfaces';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
-import { LinkedInOAuthService } from './linkedin-oauth.service';
+import { LinkedInOAuthService } from '../../auth/services/linkedin-oauth.service';
 
 /**
  * LinkedIn API Client

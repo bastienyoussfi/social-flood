@@ -51,6 +51,12 @@ export class OAuthToken {
   expiresAt: Date | null;
 
   /**
+   * Refresh token expiration timestamp (for platforms like TikTok)
+   */
+  @Column({ name: 'refresh_expires_at', type: 'timestamp', nullable: true })
+  refreshExpiresAt: Date | null;
+
+  /**
    * OAuth scopes granted
    */
   @Column('simple-array', { nullable: true })
@@ -106,5 +112,15 @@ export class OAuthToken {
     }
     const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
     return this.expiresAt < fiveMinutesFromNow;
+  }
+
+  /**
+   * Check if refresh token is expired (for platforms like TikTok)
+   */
+  isRefreshTokenExpired(): boolean {
+    if (!this.refreshExpiresAt) {
+      return false;
+    }
+    return new Date() > this.refreshExpiresAt;
   }
 }

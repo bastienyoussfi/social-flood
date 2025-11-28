@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -8,14 +8,15 @@ import { LinkedInProcessor } from './linkedin.processor';
 import { LinkedInApiClient } from './linkedin-api.client';
 import { LinkedInMediaService } from './linkedin-media.service';
 import { LinkedInQueueService } from './linkedin-queue.service';
-import { LinkedInOAuthService } from './linkedin-oauth.service';
-import { LinkedInOAuthController } from './linkedin-oauth.controller';
-import { PlatformPost, Post, OAuthToken } from '../../database/entities';
+import { PlatformPost, Post } from '../../database/entities';
+import { AuthModule } from '../../auth/auth.module';
 
 /**
  * LinkedIn Module
  * Provides complete LinkedIn integration with posting capabilities
- * and OAuth 2.0 authentication flow
+ *
+ * OAuth authentication is handled by the centralized AuthModule.
+ * This module imports AuthModule to access LinkedInOAuthService.
  *
  * Architecture:
  * - LinkedInAdapter: Queue interface for posting
@@ -24,20 +25,18 @@ import { PlatformPost, Post, OAuthToken } from '../../database/entities';
  * - LinkedInApiClient: Handles LinkedIn REST API v2 communication
  * - LinkedInMediaService: Handles media upload
  * - LinkedInQueueService: Handles queue events and database updates
- * - LinkedInOAuthService: Handles OAuth 2.0 authentication flow
- * - LinkedInOAuthController: OAuth endpoints (login, callback, status, disconnect)
  */
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([PlatformPost, Post, OAuthToken]),
+    TypeOrmModule.forFeature([PlatformPost, Post]),
     BullModule.registerQueue({
       name: 'linkedin-posts',
     }),
+    forwardRef(() => AuthModule),
   ],
-  controllers: [LinkedInOAuthController],
+  controllers: [],
   providers: [
-    LinkedInOAuthService,
     LinkedInApiClient,
     LinkedInMediaService,
     LinkedInService,
@@ -45,6 +44,6 @@ import { PlatformPost, Post, OAuthToken } from '../../database/entities';
     LinkedInProcessor,
     LinkedInQueueService,
   ],
-  exports: [LinkedInAdapter, LinkedInService, LinkedInOAuthService],
+  exports: [LinkedInAdapter, LinkedInService],
 })
 export class LinkedInModule {}

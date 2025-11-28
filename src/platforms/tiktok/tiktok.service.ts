@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PostContent } from '../../common/interfaces';
 import { TikTokApiClient } from './tiktok-api.client';
 import { TikTokMediaService } from './tiktok-media.service';
-import { TikTokAuthService } from '../../auth/tiktok-auth.service';
+import { TikTokOAuthService } from '../../auth/services/tiktok-oauth.service';
 import {
   TikTokDirectPostInitRequest,
   TikTokPublishStatusResponse,
@@ -25,7 +25,7 @@ export class TikTokService {
   constructor(
     private readonly apiClient: TikTokApiClient,
     private readonly mediaService: TikTokMediaService,
-    private readonly authService: TikTokAuthService,
+    private readonly authService: TikTokOAuthService,
   ) {}
 
   /**
@@ -50,7 +50,10 @@ export class TikTokService {
       if (tiktokUserId) {
         // Use OAuth token from database
         this.logger.log(`Using OAuth token for user: ${tiktokUserId}`);
-        accessToken = await this.authService.getValidAccessToken(tiktokUserId);
+        accessToken =
+          await this.authService.getValidAccessTokenByTikTokUserId(
+            tiktokUserId,
+          );
       } else {
         // Fall back to static token from environment
         this.logger.log('Using static token from environment');

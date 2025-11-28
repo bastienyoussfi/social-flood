@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { LinkedInApiClient } from './linkedin-api.client';
-import { LinkedInOAuthService } from './linkedin-oauth.service';
+import { LinkedInOAuthService } from '../../auth/services/linkedin-oauth.service';
 import {
   LinkedInVisibility,
   LinkedInDistributionFeed,
