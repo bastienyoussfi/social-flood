@@ -6,7 +6,12 @@
 /**
  * Supported OAuth platforms
  */
-export type OAuthPlatform = 'twitter' | 'tiktok' | 'linkedin' | 'pinterest';
+export type OAuthPlatform =
+  | 'twitter'
+  | 'tiktok'
+  | 'linkedin'
+  | 'pinterest'
+  | 'youtube';
 
 /**
  * OAuth configuration for a platform

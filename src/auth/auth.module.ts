@@ -11,12 +11,14 @@ import { TwitterOAuthService } from './services/twitter-oauth.service';
 import { TikTokOAuthService } from './services/tiktok-oauth.service';
 import { LinkedInOAuthService } from './services/linkedin-oauth.service';
 import { PinterestOAuthService } from './services/pinterest-oauth.service';
+import { YouTubeOAuthService } from './services/youtube-oauth.service';
 
 // OAuth Controllers
 import { TwitterOAuthController } from './controllers/twitter-oauth.controller';
 import { TikTokOAuthController } from './controllers/tiktok-oauth.controller';
 import { LinkedInOAuthController } from './controllers/linkedin-oauth.controller';
 import { PinterestOAuthController } from './controllers/pinterest-oauth.controller';
+import { YouTubeOAuthController } from './controllers/youtube-oauth.controller';
 
 /**
  * Authentication Module
@@ -34,6 +36,7 @@ import { PinterestOAuthController } from './controllers/pinterest-oauth.controll
  * - TikTok (OAuth 2.0)
  * - LinkedIn (OAuth 2.0)
  * - Pinterest (OAuth 2.0)
+ * - YouTube (Google OAuth 2.0)
  */
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature([OAuthToken])],
@@ -42,6 +45,7 @@ import { PinterestOAuthController } from './controllers/pinterest-oauth.controll
     TikTokOAuthController,
     LinkedInOAuthController,
     PinterestOAuthController,
+    YouTubeOAuthController,
   ],
   providers: [
     // Shared utilities
@@ -51,6 +55,7 @@ import { PinterestOAuthController } from './controllers/pinterest-oauth.controll
     TikTokOAuthService,
     LinkedInOAuthService,
     PinterestOAuthService,
+    YouTubeOAuthService,
   ],
   exports: [
     // Export services for use in platform modules
@@ -58,6 +63,7 @@ import { PinterestOAuthController } from './controllers/pinterest-oauth.controll
     TikTokOAuthService,
     LinkedInOAuthService,
     PinterestOAuthService,
+    YouTubeOAuthService,
     OAuthStateManager,
   ],
 })
