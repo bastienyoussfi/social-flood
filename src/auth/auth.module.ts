@@ -12,6 +12,7 @@ import { TikTokOAuthService } from './services/tiktok-oauth.service';
 import { LinkedInOAuthService } from './services/linkedin-oauth.service';
 import { PinterestOAuthService } from './services/pinterest-oauth.service';
 import { YouTubeOAuthService } from './services/youtube-oauth.service';
+import { InstagramOAuthService } from './services/instagram-oauth.service';
 
 // OAuth Controllers
 import { TwitterOAuthController } from './controllers/twitter-oauth.controller';
@@ -19,6 +20,7 @@ import { TikTokOAuthController } from './controllers/tiktok-oauth.controller';
 import { LinkedInOAuthController } from './controllers/linkedin-oauth.controller';
 import { PinterestOAuthController } from './controllers/pinterest-oauth.controller';
 import { YouTubeOAuthController } from './controllers/youtube-oauth.controller';
+import { InstagramOAuthController } from './controllers/instagram-oauth.controller';
 
 /**
  * Authentication Module
@@ -46,6 +48,7 @@ import { YouTubeOAuthController } from './controllers/youtube-oauth.controller';
     LinkedInOAuthController,
     PinterestOAuthController,
     YouTubeOAuthController,
+    InstagramOAuthController,
   ],
   providers: [
     // Shared utilities
@@ -56,6 +59,7 @@ import { YouTubeOAuthController } from './controllers/youtube-oauth.controller';
     LinkedInOAuthService,
     PinterestOAuthService,
     YouTubeOAuthService,
+    InstagramOAuthService,
   ],
   exports: [
     // Export services for use in platform modules
@@ -64,6 +68,7 @@ import { YouTubeOAuthController } from './controllers/youtube-oauth.controller';
     LinkedInOAuthService,
     PinterestOAuthService,
     YouTubeOAuthService,
+    InstagramOAuthService,
     OAuthStateManager,
   ],
 })

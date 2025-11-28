@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Social Flood is a NestJS application for posting content simultaneously to multiple social media platforms (LinkedIn, Twitter, Bluesky, TikTok, Pinterest). It uses a queue-based architecture with Bull/Redis for reliable asynchronous job processing and PostgreSQL for persistence.
+Social Flood is a NestJS application for posting content simultaneously to multiple social media platforms (LinkedIn, Twitter, Bluesky, TikTok, Pinterest, Instagram). It uses a queue-based architecture with Bull/Redis for reliable asynchronous job processing and PostgreSQL for persistence.
 
 ## Development Commands
 
@@ -84,6 +84,7 @@ src/platforms/{platform}/
 - `bluesky-posts`
 - `tiktok-posts`
 - `pinterest-posts`
+- `instagram-posts`
 
 **Retry configuration**: 3 attempts with exponential backoff (2s, 4s, 8s)
 
@@ -107,7 +108,7 @@ src/platforms/{platform}/
 2. **platform_posts** - Child records per platform
    - `id` (UUID)
    - `post_id` (FK to posts)
-   - `platform` (linkedin | twitter | bluesky | tiktok | pinterest)
+   - `platform` (linkedin | twitter | bluesky | tiktok | pinterest | instagram)
    - `platform_post_id` (ID from platform API)
    - `status` (queued | posted | failed)
    - `posted_at`, `url`, `error_message`
@@ -121,8 +122,9 @@ Additional entities:
 **AuthModule** (`src/auth/`) currently handles OAuth flows for platforms requiring it:
 - TikTok uses OAuth 2.0 with refresh tokens
 - Pinterest uses OAuth 2.0
-- LinkedIn uses static access tokens (OAuth flow not yet implemented)
-- Twitter uses OAuth 1.0a with static credentials
+- LinkedIn uses OAuth 2.0
+- Twitter uses OAuth 2.0 with PKCE
+- Instagram uses Meta's OAuth 2.0 (via Facebook Graph API)
 - Bluesky uses app passwords
 
 ## Platform-Specific Notes
@@ -133,6 +135,7 @@ Additional entities:
 - Bluesky: 300 characters
 - TikTok: Video platform (different constraints)
 - Pinterest: Image-focused with descriptions
+- Instagram: 2200 characters (caption), max 30 hashtags
 
 ### Media Handling
 Each platform has its own media upload flow:
@@ -141,11 +144,13 @@ Each platform has its own media upload flow:
 - Bluesky: Upload blob → get blob reference → embed in post
 - Pinterest: Requires media URL (external or uploaded)
 - TikTok: Video upload via chunked upload API
+- Instagram: Container-based 2-step flow (create container → publish)
 
 ### OAuth Flows
-- TikTok and Pinterest have OAuth callback endpoints at `/api/auth/{platform}/callback`
+- All OAuth platforms have callback endpoints at `/api/auth/{platform}/callback`
 - Tokens are stored in database and automatically refreshed when expired
-- Use `TikTokAuthService` and `PinterestAuthService` for token management
+- Use platform-specific OAuth services: `TikTokAuthService`, `PinterestAuthService`, `InstagramOAuthService`, etc.
+- Instagram requires Business/Creator account linked to a Facebook Page
 
 ## API Structure
 
@@ -177,11 +182,12 @@ Required variables are in `.env.example`. Key ones:
 - `REDIS_HOST`, `REDIS_PORT`
 
 **Platform Credentials**:
-- LinkedIn: `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`
+- LinkedIn: `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_REDIRECT_URI`
 - Twitter: `TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET`
 - Bluesky: `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`
 - TikTok: `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_REDIRECT_URI`
 - Pinterest: `PINTEREST_APP_ID`, `PINTEREST_APP_SECRET`, `PINTEREST_REDIRECT_URI`
+- Instagram: `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI`
 
 ## Adding a New Platform
 

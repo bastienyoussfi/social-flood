@@ -10,6 +10,7 @@ export enum Platform {
   BLUESKY = 'bluesky',
   TIKTOK = 'tiktok',
   PINTEREST = 'pinterest',
+  INSTAGRAM = 'instagram',
 }
 
 export interface MediaAttachment {

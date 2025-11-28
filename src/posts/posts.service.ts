@@ -8,6 +8,7 @@ import { TwitterAdapter } from '../platforms/twitter/twitter.adapter';
 import { BlueskyAdapter } from '../platforms/bluesky/bluesky.adapter';
 import { TikTokAdapter } from '../platforms/tiktok/tiktok.adapter';
 import { PinterestAdapter } from '../platforms/pinterest/pinterest.adapter';
+import { InstagramAdapter } from '../platforms/instagram/instagram.adapter';
 import {
   PostContent,
   Platform,
@@ -32,6 +33,7 @@ export class PostsService {
     private readonly blueskyAdapter: BlueskyAdapter,
     private readonly tiktokAdapter: TikTokAdapter,
     private readonly pinterestAdapter: PinterestAdapter,
+    private readonly instagramAdapter: InstagramAdapter,
   ) {
     // Initialize adapter registry
     this.platformAdapters = new Map<Platform, PlatformAdapter>([
@@ -40,6 +42,7 @@ export class PostsService {
       [Platform.BLUESKY, this.blueskyAdapter],
       [Platform.TIKTOK, this.tiktokAdapter],
       [Platform.PINTEREST, this.pinterestAdapter],
+      [Platform.INSTAGRAM, this.instagramAdapter],
     ]);
   }
 
@@ -66,6 +69,9 @@ export class PostsService {
         }),
         ...(createPostDto.twitterUserId && {
           twitterUserId: createPostDto.twitterUserId,
+        }),
+        ...(createPostDto.instagramUserId && {
+          userId: createPostDto.instagramUserId,
         }),
       },
     };

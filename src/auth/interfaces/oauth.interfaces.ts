@@ -11,7 +11,8 @@ export type OAuthPlatform =
   | 'tiktok'
   | 'linkedin'
   | 'pinterest'
-  | 'youtube';
+  | 'youtube'
+  | 'instagram';
 
 /**
  * OAuth configuration for a platform

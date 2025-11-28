@@ -73,6 +73,9 @@ services:
       YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID}
       YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET}
       YOUTUBE_REDIRECT_URI: ${YOUTUBE_REDIRECT_URI}
+      META_APP_ID: ${META_APP_ID}
+      META_APP_SECRET: ${META_APP_SECRET}
+      META_REDIRECT_URI: ${META_REDIRECT_URI}
     depends_on:
       postgres:
         condition: service_healthy

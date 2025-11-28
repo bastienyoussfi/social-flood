@@ -8,6 +8,7 @@ import { TwitterModule } from '../platforms/twitter/twitter.module';
 import { BlueskyModule } from '../platforms/bluesky/bluesky.module';
 import { TikTokModule } from '../platforms/tiktok/tiktok.module';
 import { PinterestModule } from '../platforms/pinterest/pinterest.module';
+import { InstagramModule } from '../platforms/instagram/instagram.module';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { PinterestModule } from '../platforms/pinterest/pinterest.module';
     BlueskyModule,
     TikTokModule,
     PinterestModule,
-    TikTokModule,
+    InstagramModule,
   ],
   controllers: [PostsController],
   providers: [PostsService],

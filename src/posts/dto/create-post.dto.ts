@@ -101,4 +101,14 @@ export class CreatePostDto {
   @IsOptional()
   @IsString()
   twitterUserId?: string;
+
+  @ApiProperty({
+    description:
+      'Instagram user ID (required when posting to Instagram with OAuth)',
+    required: false,
+    example: 'user@example.com',
+  })
+  @IsOptional()
+  @IsString()
+  instagramUserId?: string;
 }

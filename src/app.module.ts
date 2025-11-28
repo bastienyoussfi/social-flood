@@ -11,6 +11,7 @@ import { TwitterModule } from './platforms/twitter/twitter.module';
 import { BlueskyModule } from './platforms/bluesky/bluesky.module';
 import { TikTokModule } from './platforms/tiktok/tiktok.module';
 import { PinterestModule } from './platforms/pinterest/pinterest.module';
+import { InstagramModule } from './platforms/instagram/instagram.module';
 import { getDatabaseConfig } from './config/database.config';
 import { getRedisConfig } from './config/redis.config';
 
@@ -45,6 +46,7 @@ import { getRedisConfig } from './config/redis.config';
       { name: 'bluesky-posts' },
       { name: 'tiktok-posts' },
       { name: 'pinterest-posts' },
+      { name: 'instagram-posts' },
     ),
 
     // Authentication
@@ -56,6 +58,7 @@ import { getRedisConfig } from './config/redis.config';
     BlueskyModule,
     TikTokModule,
     PinterestModule,
+    InstagramModule,
 
     // Business logic modules
     PostsModule,
