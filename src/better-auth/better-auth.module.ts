@@ -15,13 +15,7 @@ import { auth } from '../lib/auth';
  * All auth routes are exposed at /api/auth/*
  */
 @Module({
-  imports: [
-    AuthModule.forRoot({
-      auth,
-      // Mount at /api/auth to match our API structure
-      basePath: '/api/auth',
-    }),
-  ],
+  imports: [AuthModule.forRoot({ auth })],
   exports: [AuthModule],
 })
 export class BetterAuthModule {}
