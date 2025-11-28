@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { LinkedInApiClient } from './linkedin-api.client';
+import { LinkedInOAuthService } from './linkedin-oauth.service';
 import {
   LinkedInVisibility,
   LinkedInDistributionFeed,
@@ -26,6 +27,12 @@ describe('LinkedInApiClient', () => {
     LINKEDIN_PERSON_URN: 'urn:li:person:123456',
   };
 
+  const mockOAuthService = {
+    getAccessToken: jest.fn(),
+    getPersonUrn: jest.fn(),
+    hasValidToken: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -35,6 +42,10 @@ describe('LinkedInApiClient', () => {
           useValue: {
             get: jest.fn((key: string) => mockConfig[key]),
           },
+        },
+        {
+          provide: LinkedInOAuthService,
+          useValue: mockOAuthService,
         },
       ],
     }).compile();
@@ -69,7 +80,10 @@ describe('LinkedInApiClient', () => {
       };
 
       expect(() => {
-        new LinkedInApiClient(invalidConfigService as unknown as ConfigService);
+        new LinkedInApiClient(
+          invalidConfigService as unknown as ConfigService,
+          mockOAuthService as unknown as LinkedInOAuthService,
+        );
       }).toThrow('LinkedIn OAuth credentials are not properly configured');
     });
 
@@ -192,6 +206,7 @@ describe('LinkedInApiClient', () => {
 
       const noTokenClient = new LinkedInApiClient(
         noTokenConfigService as unknown as ConfigService,
+        mockOAuthService as unknown as LinkedInOAuthService,
       );
 
       await expect(noTokenClient.createPost('Test')).rejects.toThrow(
@@ -209,6 +224,7 @@ describe('LinkedInApiClient', () => {
 
       const noUrnClient = new LinkedInApiClient(
         noUrnConfigService as unknown as ConfigService,
+        mockOAuthService as unknown as LinkedInOAuthService,
       );
 
       await expect(noUrnClient.createPost('Test')).rejects.toThrow(

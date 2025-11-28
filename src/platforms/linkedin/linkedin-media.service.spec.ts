@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LinkedInMediaService } from './linkedin-media.service';
 import { LinkedInApiClient } from './linkedin-api.client';
+import { LinkedInOAuthService } from './linkedin-oauth.service';
 import { MediaAttachment } from '../../common/interfaces';
 
 describe('LinkedInMediaService', () => {
@@ -12,6 +13,11 @@ describe('LinkedInMediaService', () => {
     getPersonUrn: jest.fn().mockReturnValue('urn:li:person:123456'),
   };
 
+  const mockOAuthService = {
+    getAccessToken: jest.fn(),
+    getPersonUrn: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -19,6 +25,10 @@ describe('LinkedInMediaService', () => {
         {
           provide: LinkedInApiClient,
           useValue: mockApiClient,
+        },
+        {
+          provide: LinkedInOAuthService,
+          useValue: mockOAuthService,
         },
       ],
     }).compile();

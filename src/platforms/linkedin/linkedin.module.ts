@@ -8,11 +8,14 @@ import { LinkedInProcessor } from './linkedin.processor';
 import { LinkedInApiClient } from './linkedin-api.client';
 import { LinkedInMediaService } from './linkedin-media.service';
 import { LinkedInQueueService } from './linkedin-queue.service';
-import { PlatformPost, Post } from '../../database/entities';
+import { LinkedInOAuthService } from './linkedin-oauth.service';
+import { LinkedInOAuthController } from './linkedin-oauth.controller';
+import { PlatformPost, Post, OAuthToken } from '../../database/entities';
 
 /**
  * LinkedIn Module
  * Provides complete LinkedIn integration with posting capabilities
+ * and OAuth 2.0 authentication flow
  *
  * Architecture:
  * - LinkedInAdapter: Queue interface for posting
@@ -21,16 +24,20 @@ import { PlatformPost, Post } from '../../database/entities';
  * - LinkedInApiClient: Handles LinkedIn REST API v2 communication
  * - LinkedInMediaService: Handles media upload
  * - LinkedInQueueService: Handles queue events and database updates
+ * - LinkedInOAuthService: Handles OAuth 2.0 authentication flow
+ * - LinkedInOAuthController: OAuth endpoints (login, callback, status, disconnect)
  */
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([PlatformPost, Post]),
+    TypeOrmModule.forFeature([PlatformPost, Post, OAuthToken]),
     BullModule.registerQueue({
       name: 'linkedin-posts',
     }),
   ],
+  controllers: [LinkedInOAuthController],
   providers: [
+    LinkedInOAuthService,
     LinkedInApiClient,
     LinkedInMediaService,
     LinkedInService,
@@ -38,6 +45,6 @@ import { PlatformPost, Post } from '../../database/entities';
     LinkedInProcessor,
     LinkedInQueueService,
   ],
-  exports: [LinkedInAdapter, LinkedInService],
+  exports: [LinkedInAdapter, LinkedInService, LinkedInOAuthService],
 })
 export class LinkedInModule {}

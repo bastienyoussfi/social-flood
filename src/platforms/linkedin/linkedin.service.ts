@@ -9,6 +9,7 @@ import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
  * LinkedIn Service
  * Orchestrates the process of posting to LinkedIn
  * Coordinates between API client and media service
+ * Supports both env-based credentials and OAuth user tokens
  */
 @Injectable()
 export class LinkedInService {
@@ -20,7 +21,7 @@ export class LinkedInService {
   ) {}
 
   /**
-   * Publish a post to LinkedIn
+   * Publish a post to LinkedIn using environment-based credentials
    * Handles text and media attachments
    * @param content - Post content with text and optional media
    * @returns Post ID and URL
@@ -101,6 +102,96 @@ export class LinkedInService {
   }
 
   /**
+   * Publish a post to LinkedIn using OAuth tokens for a specific user
+   * Handles text and media attachments
+   * @param userId - User identifier for OAuth token retrieval
+   * @param content - Post content with text and optional media
+   * @returns Post ID and URL
+   */
+  async publishPostForUser(
+    userId: string,
+    content: PostContent,
+  ): Promise<{
+    platformPostId: string;
+    url: string;
+  }> {
+    try {
+      this.logger.log(`Starting LinkedIn post publication for user: ${userId}`);
+
+      // Validate user has valid OAuth credentials
+      const isConfigured = await this.apiClient.isConfiguredForUser(userId);
+      if (!isConfigured) {
+        throw new Error(
+          `LinkedIn OAuth not configured for user ${userId}. Please authenticate first via /auth/linkedin/login`,
+        );
+      }
+
+      // Validate content
+      this.validateContent(content);
+
+      // Step 1: Upload media if present
+      let mediaUrns: string[] = [];
+      if (content.media && content.media.length > 0) {
+        this.logger.log(
+          `Processing ${content.media.length} media attachment(s) for user ${userId}`,
+        );
+
+        // Validate media before attempting upload
+        const mediaValidation = this.mediaService.validateMedia(content.media);
+        if (!mediaValidation.valid) {
+          throw new Error(
+            `Media validation failed: ${mediaValidation.errors.join(', ')}`,
+          );
+        }
+
+        // Upload media with user's OAuth token
+        mediaUrns = await this.mediaService.uploadMediaForUser(
+          userId,
+          content.media,
+        );
+        this.logger.log(
+          `Successfully uploaded ${mediaUrns.length} media item(s)`,
+        );
+      }
+
+      // Step 2: Prepare post commentary
+      let commentary = content.text;
+
+      // Add link if provided (LinkedIn will auto-expand it)
+      if (content.link) {
+        commentary = `${commentary}\n\n${content.link}`;
+      }
+
+      // Step 3: Create post with text and media using user's OAuth token
+      const result: LinkedInPostResult = await this.apiClient.createPostForUser(
+        userId,
+        commentary,
+        mediaUrns.length > 0 ? mediaUrns : undefined,
+      );
+
+      this.logger.log(
+        `LinkedIn post published successfully for user ${userId}. ID: ${result.postId}, URL: ${result.url}`,
+      );
+
+      return {
+        platformPostId: result.postId,
+        url: result.url,
+      };
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      const errorStack = getErrorStack(error);
+
+      this.logger.error(
+        `Failed to publish LinkedIn post for user ${userId}: ${errorMessage}`,
+        errorStack,
+      );
+
+      // Re-throw with context
+      throw new Error(`LinkedIn posting failed: ${errorMessage}`);
+    }
+  }
+
+  /**
    * Validate post content
    * Basic validation before processing
    */
@@ -118,10 +209,19 @@ export class LinkedInService {
   }
 
   /**
-   * Check if the LinkedIn integration is ready
+   * Check if the LinkedIn integration is ready (env-based)
    * Useful for health checks
    */
   isReady(): boolean {
     return this.apiClient.isConfigured();
+  }
+
+  /**
+   * Check if the LinkedIn integration is ready for a specific user
+   * @param userId - User identifier
+   * @returns True if user has valid OAuth credentials
+   */
+  async isReadyForUser(userId: string): Promise<boolean> {
+    return this.apiClient.isConfiguredForUser(userId);
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   LinkedInConfig,
@@ -12,11 +12,13 @@ import {
   LINKEDIN_PROTOCOL_VERSION,
 } from './interfaces';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
+import { LinkedInOAuthService } from './linkedin-oauth.service';
 
 /**
  * LinkedIn API Client
  * Handles all direct communication with LinkedIn REST API v2
  * Uses OAuth 2.0 for authentication
+ * Supports both static env-based tokens and dynamic user-specific OAuth tokens
  */
 @Injectable()
 export class LinkedInApiClient {
@@ -24,7 +26,11 @@ export class LinkedInApiClient {
   private readonly config: LinkedInConfig;
   private readonly baseUrl = 'https://api.linkedin.com';
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject(forwardRef(() => LinkedInOAuthService))
+    private readonly oauthService: LinkedInOAuthService,
+  ) {
     this.config = this.loadConfig();
     this.validateConfig();
   }
@@ -60,13 +66,13 @@ export class LinkedInApiClient {
 
     if (!this.config.accessToken) {
       this.logger.warn(
-        'LINKEDIN_ACCESS_TOKEN is not set. You will need to implement OAuth 2.0 flow to obtain an access token.',
+        'LINKEDIN_ACCESS_TOKEN is not set. Use OAuth 2.0 flow or createPostForUser() method.',
       );
     }
 
     if (!this.config.personUrn) {
       this.logger.warn(
-        'LINKEDIN_PERSON_URN is not set. Posts will require author URN to be provided.',
+        'LINKEDIN_PERSON_URN is not set. Use OAuth 2.0 flow or createPostForUser() method.',
       );
     }
 
@@ -74,7 +80,7 @@ export class LinkedInApiClient {
   }
 
   /**
-   * Post content to LinkedIn
+   * Post content to LinkedIn using environment-based credentials
    * @param commentary - Post text content
    * @param mediaUrns - Array of uploaded media URNs (optional)
    * @returns Post ID and URL
@@ -83,26 +89,83 @@ export class LinkedInApiClient {
     commentary: string,
     mediaUrns?: string[],
   ): Promise<LinkedInPostResult> {
+    if (!this.config.accessToken) {
+      throw new Error(
+        'LinkedIn access token is not configured. Please set LINKEDIN_ACCESS_TOKEN or use createPostForUser().',
+      );
+    }
+
+    if (!this.config.personUrn) {
+      throw new Error(
+        'LinkedIn person URN is not configured. Please set LINKEDIN_PERSON_URN or use createPostForUser().',
+      );
+    }
+
+    return this.executeCreatePost(
+      commentary,
+      this.config.accessToken,
+      this.config.personUrn,
+      mediaUrns,
+    );
+  }
+
+  /**
+   * Post content to LinkedIn using OAuth tokens for a specific user
+   * @param userId - User identifier to fetch OAuth token for
+   * @param commentary - Post text content
+   * @param mediaUrns - Array of uploaded media URNs (optional)
+   * @returns Post ID and URL
+   */
+  async createPostForUser(
+    userId: string,
+    commentary: string,
+    mediaUrns?: string[],
+  ): Promise<LinkedInPostResult> {
+    // Get access token and person URN from OAuth service
+    const accessToken = await this.oauthService.getAccessToken(userId);
+    if (!accessToken) {
+      throw new Error(
+        `No valid LinkedIn access token found for user ${userId}. Please authenticate first.`,
+      );
+    }
+
+    const personUrn = await this.oauthService.getPersonUrn(userId);
+    if (!personUrn) {
+      throw new Error(
+        `No LinkedIn person URN found for user ${userId}. Please re-authenticate.`,
+      );
+    }
+
+    return this.executeCreatePost(
+      commentary,
+      accessToken,
+      personUrn,
+      mediaUrns,
+    );
+  }
+
+  /**
+   * Execute the post creation with provided credentials
+   * @param commentary - Post text content
+   * @param accessToken - OAuth access token
+   * @param personUrn - LinkedIn person URN
+   * @param mediaUrns - Array of uploaded media URNs (optional)
+   * @returns Post ID and URL
+   */
+  private async executeCreatePost(
+    commentary: string,
+    accessToken: string,
+    personUrn: string,
+    mediaUrns?: string[],
+  ): Promise<LinkedInPostResult> {
     try {
       this.logger.log(
         `Creating LinkedIn post: "${commentary.substring(0, 50)}${commentary.length > 50 ? '...' : ''}"`,
       );
 
-      if (!this.config.accessToken) {
-        throw new Error(
-          'LinkedIn access token is not configured. Please set LINKEDIN_ACCESS_TOKEN.',
-        );
-      }
-
-      if (!this.config.personUrn) {
-        throw new Error(
-          'LinkedIn person URN is not configured. Please set LINKEDIN_PERSON_URN.',
-        );
-      }
-
       // Build post DTO
       const postDto: LinkedInPostDto = {
-        author: this.config.personUrn,
+        author: personUrn,
         commentary,
         visibility: LinkedInVisibility.PUBLIC,
         distribution: {
@@ -137,7 +200,7 @@ export class LinkedInApiClient {
       // Make API request
       const response = await fetch(`${this.baseUrl}/rest/posts`, {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: this.getHeadersWithToken(accessToken),
         body: JSON.stringify(postDto),
       });
 
@@ -169,11 +232,23 @@ export class LinkedInApiClient {
   }
 
   /**
-   * Get standard headers for LinkedIn API requests
+   * Get standard headers for LinkedIn API requests (env-based token)
    */
   private getHeaders(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.config.accessToken}`,
+      'LinkedIn-Version': LINKEDIN_API_VERSION,
+      'X-Restli-Protocol-Version': LINKEDIN_PROTOCOL_VERSION,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  /**
+   * Get headers with a specific access token
+   */
+  private getHeadersWithToken(accessToken: string): Record<string, string> {
+    return {
+      Authorization: `Bearer ${accessToken}`,
       'LinkedIn-Version': LINKEDIN_API_VERSION,
       'X-Restli-Protocol-Version': LINKEDIN_PROTOCOL_VERSION,
       'Content-Type': 'application/json',
@@ -254,7 +329,7 @@ export class LinkedInApiClient {
   }
 
   /**
-   * Check if the client is properly configured
+   * Check if the client is properly configured with env-based credentials
    */
   isConfigured(): boolean {
     return !!(
@@ -266,6 +341,15 @@ export class LinkedInApiClient {
   }
 
   /**
+   * Check if a user has valid OAuth credentials
+   * @param userId - User identifier
+   * @returns True if user has valid credentials
+   */
+  async isConfiguredForUser(userId: string): Promise<boolean> {
+    return this.oauthService.hasValidToken(userId);
+  }
+
+  /**
    * Get the base API URL for media operations
    */
   getBaseUrl(): string {
@@ -273,16 +357,34 @@ export class LinkedInApiClient {
   }
 
   /**
-   * Get access token for media service
+   * Get access token for media service (env-based)
    */
   getAccessToken(): string | undefined {
     return this.config.accessToken;
   }
 
   /**
-   * Get person URN for media ownership
+   * Get access token for a specific user
+   * @param userId - User identifier
+   * @returns Access token or null
+   */
+  async getAccessTokenForUser(userId: string): Promise<string | null> {
+    return this.oauthService.getAccessToken(userId);
+  }
+
+  /**
+   * Get person URN for media ownership (env-based)
    */
   getPersonUrn(): string | undefined {
     return this.config.personUrn;
+  }
+
+  /**
+   * Get person URN for a specific user
+   * @param userId - User identifier
+   * @returns Person URN or null
+   */
+  async getPersonUrnForUser(userId: string): Promise<string | null> {
+    return this.oauthService.getPersonUrn(userId);
   }
 }

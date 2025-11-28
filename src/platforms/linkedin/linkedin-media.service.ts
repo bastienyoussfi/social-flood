@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { LinkedInApiClient } from './linkedin-api.client';
 import { MediaAttachment } from '../../common/interfaces';
 import {
@@ -8,11 +8,13 @@ import {
   LINKEDIN_PROTOCOL_VERSION,
 } from './interfaces';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
+import { LinkedInOAuthService } from './linkedin-oauth.service';
 
 /**
  * LinkedIn Media Service
  * Handles downloading media from URLs and uploading to LinkedIn
  * Supports images (up to 20 per post)
+ * Works with both env-based credentials and OAuth user tokens
  */
 @Injectable()
 export class LinkedInMediaService {
@@ -28,14 +30,72 @@ export class LinkedInMediaService {
     'image/gif',
   ];
 
-  constructor(private readonly apiClient: LinkedInApiClient) {}
+  constructor(
+    @Inject(forwardRef(() => LinkedInApiClient))
+    private readonly apiClient: LinkedInApiClient,
+    @Inject(forwardRef(() => LinkedInOAuthService))
+    private readonly oauthService: LinkedInOAuthService,
+  ) {}
 
   /**
-   * Upload media attachments to LinkedIn
+   * Upload media attachments to LinkedIn using env-based credentials
    * @param media - Array of media attachments with URLs
    * @returns Array of LinkedIn media URNs
    */
   async uploadMedia(media: MediaAttachment[]): Promise<string[]> {
+    const accessToken = this.apiClient.getAccessToken();
+    const personUrn = this.apiClient.getPersonUrn();
+
+    if (!accessToken) {
+      throw new Error('Access token is not configured');
+    }
+
+    if (!personUrn) {
+      throw new Error('Person URN is not configured');
+    }
+
+    return this.executeUploadMedia(media, accessToken, personUrn);
+  }
+
+  /**
+   * Upload media attachments to LinkedIn using OAuth user tokens
+   * @param userId - User identifier
+   * @param media - Array of media attachments with URLs
+   * @returns Array of LinkedIn media URNs
+   */
+  async uploadMediaForUser(
+    userId: string,
+    media: MediaAttachment[],
+  ): Promise<string[]> {
+    const accessToken = await this.oauthService.getAccessToken(userId);
+    if (!accessToken) {
+      throw new Error(
+        `No valid LinkedIn access token found for user ${userId}. Please authenticate first.`,
+      );
+    }
+
+    const personUrn = await this.oauthService.getPersonUrn(userId);
+    if (!personUrn) {
+      throw new Error(
+        `No LinkedIn person URN found for user ${userId}. Please re-authenticate.`,
+      );
+    }
+
+    return this.executeUploadMedia(media, accessToken, personUrn);
+  }
+
+  /**
+   * Execute media upload with provided credentials
+   * @param media - Array of media attachments with URLs
+   * @param accessToken - OAuth access token
+   * @param personUrn - LinkedIn person URN
+   * @returns Array of LinkedIn media URNs
+   */
+  private async executeUploadMedia(
+    media: MediaAttachment[],
+    accessToken: string,
+    personUrn: string,
+  ): Promise<string[]> {
     if (!media || media.length === 0) {
       return [];
     }
@@ -68,7 +128,11 @@ export class LinkedInMediaService {
         }
 
         // Upload single image
-        const mediaUrn = await this.uploadSingleImage(attachment);
+        const mediaUrn = await this.uploadSingleImageWithCredentials(
+          attachment,
+          accessToken,
+          personUrn,
+        );
         mediaUrns.push(mediaUrn);
 
         this.logger.log(`Media ${i + 1} uploaded successfully: ${mediaUrn}`);
@@ -94,17 +158,24 @@ export class LinkedInMediaService {
   }
 
   /**
-   * Upload a single image to LinkedIn
+   * Upload a single image to LinkedIn with specific credentials
    * Process: Initialize upload -> Download image -> Upload binary
    * @param attachment - Media attachment with URL
+   * @param accessToken - OAuth access token
+   * @param personUrn - LinkedIn person URN
    * @returns LinkedIn media URN
    */
-  private async uploadSingleImage(
+  private async uploadSingleImageWithCredentials(
     attachment: MediaAttachment,
+    accessToken: string,
+    personUrn: string,
   ): Promise<string> {
     try {
       // Step 1: Initialize the upload
-      const uploadInit = await this.initializeImageUpload();
+      const uploadInit = await this.initializeImageUploadWithCredentials(
+        accessToken,
+        personUrn,
+      );
       const { uploadUrl, image: imageUrn } = uploadInit.value;
 
       this.logger.log(`Initialized upload. Image URN: ${imageUrn}`);
@@ -120,7 +191,11 @@ export class LinkedInMediaService {
       }
 
       // Step 3: Upload the image binary to LinkedIn
-      await this.uploadImageBinary(uploadUrl, imageBuffer);
+      await this.uploadImageBinaryWithCredentials(
+        uploadUrl,
+        imageBuffer,
+        accessToken,
+      );
 
       this.logger.log(`Image uploaded successfully: ${imageUrn}`);
 
@@ -135,21 +210,16 @@ export class LinkedInMediaService {
   }
 
   /**
-   * Initialize image upload with LinkedIn
+   * Initialize image upload with LinkedIn using specific credentials
+   * @param accessToken - OAuth access token
+   * @param personUrn - LinkedIn person URN
    * @returns Upload URL and image URN
    */
-  private async initializeImageUpload(): Promise<LinkedInImageUploadInit> {
+  private async initializeImageUploadWithCredentials(
+    accessToken: string,
+    personUrn: string,
+  ): Promise<LinkedInImageUploadInit> {
     try {
-      const personUrn = this.apiClient.getPersonUrn();
-      if (!personUrn) {
-        throw new Error('Person URN is not configured');
-      }
-
-      const accessToken = this.apiClient.getAccessToken();
-      if (!accessToken) {
-        throw new Error('Access token is not configured');
-      }
-
       const initDto: LinkedInImageInitDto = {
         initializeUploadRequest: {
           owner: personUrn,
@@ -198,20 +268,17 @@ export class LinkedInMediaService {
   }
 
   /**
-   * Upload image binary to LinkedIn's upload URL
+   * Upload image binary to LinkedIn's upload URL with specific credentials
    * @param uploadUrl - Pre-signed upload URL from initialization
    * @param imageBuffer - Image binary data
+   * @param accessToken - OAuth access token
    */
-  private async uploadImageBinary(
+  private async uploadImageBinaryWithCredentials(
     uploadUrl: string,
     imageBuffer: Buffer,
+    accessToken: string,
   ): Promise<void> {
     try {
-      const accessToken = this.apiClient.getAccessToken();
-      if (!accessToken) {
-        throw new Error('Access token is not configured');
-      }
-
       const response = await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
