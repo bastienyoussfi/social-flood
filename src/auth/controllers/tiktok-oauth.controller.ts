@@ -24,7 +24,7 @@ import { getErrorMessage } from '../../common/utils/error.utils';
  * - DELETE /api/auth/tiktok/:userId - Disconnect user
  * - GET /api/auth/tiktok/users - List all authenticated users (admin)
  */
-@Controller('api/auth/tiktok')
+@Controller('api/oauth/tiktok')
 export class TikTokOAuthController {
   private readonly logger = new Logger(TikTokOAuthController.name);
 

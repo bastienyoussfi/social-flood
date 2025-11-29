@@ -24,7 +24,7 @@ import { getErrorMessage } from '../../common/utils/error.utils';
  * - DELETE /api/auth/pinterest/:userId - Disconnect user
  * - GET /api/auth/pinterest/users - List all authenticated users (admin)
  */
-@Controller('api/auth/pinterest')
+@Controller('api/oauth/pinterest')
 export class PinterestOAuthController {
   private readonly logger = new Logger(PinterestOAuthController.name);
 

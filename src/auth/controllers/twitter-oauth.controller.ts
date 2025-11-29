@@ -24,7 +24,7 @@ import { getErrorMessage } from '../../common/utils/error.utils';
  * - DELETE /api/auth/twitter/:userId - Disconnect user
  * - GET /api/auth/twitter/users - List all authenticated users (admin)
  */
-@Controller('api/auth/twitter')
+@Controller('api/oauth/twitter')
 export class TwitterOAuthController {
   private readonly logger = new Logger(TwitterOAuthController.name);
 

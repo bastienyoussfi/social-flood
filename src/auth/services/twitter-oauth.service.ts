@@ -48,7 +48,7 @@ export class TwitterOAuthService extends BaseOAuthService {
         this.configService.get<string>('TWITTER_CLIENT_SECRET') || '',
       redirectUri:
         this.configService.get<string>('TWITTER_OAUTH_REDIRECT_URI') ||
-        'http://localhost:3000/api/auth/twitter/callback',
+        'http://localhost:3000/api/oauth/twitter/callback',
       scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
       authorizationUrl: 'https://twitter.com/i/oauth2/authorize',
       tokenUrl: 'https://api.twitter.com/2/oauth2/token',

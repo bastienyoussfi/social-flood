@@ -81,7 +81,7 @@ export class YouTubeOAuthService extends BaseOAuthService {
         this.configService.get<string>('YOUTUBE_CLIENT_SECRET') || '',
       redirectUri:
         this.configService.get<string>('YOUTUBE_REDIRECT_URI') ||
-        'http://localhost:3000/api/auth/youtube/callback',
+        'http://localhost:3000/api/oauth/youtube/callback',
       scopes: [
         'https://www.googleapis.com/auth/youtube.upload',
         'https://www.googleapis.com/auth/youtube',

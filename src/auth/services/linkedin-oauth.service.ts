@@ -59,7 +59,7 @@ export class LinkedInOAuthService extends BaseOAuthService {
         this.configService.get<string>('LINKEDIN_CLIENT_SECRET') || '',
       redirectUri:
         this.configService.get<string>('LINKEDIN_REDIRECT_URI') ||
-        'http://localhost:3000/api/auth/linkedin/callback',
+        'http://localhost:3000/api/oauth/linkedin/callback',
       scopes: ['openid', 'profile', 'w_member_social'],
       authorizationUrl: 'https://www.linkedin.com/oauth/v2/authorization',
       tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',

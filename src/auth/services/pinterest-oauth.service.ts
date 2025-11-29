@@ -46,7 +46,7 @@ export class PinterestOAuthService extends BaseOAuthService {
         this.configService.get<string>('PINTEREST_APP_SECRET') || '',
       redirectUri:
         this.configService.get<string>('PINTEREST_REDIRECT_URI') ||
-        'http://localhost:3000/api/auth/pinterest/callback',
+        'http://localhost:3000/api/oauth/pinterest/callback',
       scopes: [
         'boards:read',
         'boards:write',

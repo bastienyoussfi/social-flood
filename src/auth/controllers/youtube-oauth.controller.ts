@@ -24,7 +24,7 @@ import { getErrorMessage } from '../../common/utils/error.utils';
  * - DELETE /api/auth/youtube/:userId - Disconnect user
  * - GET /api/auth/youtube/users - List all authenticated users (admin)
  */
-@Controller('api/auth/youtube')
+@Controller('api/oauth/youtube')
 export class YouTubeOAuthController {
   private readonly logger = new Logger(YouTubeOAuthController.name);
 

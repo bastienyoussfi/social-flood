@@ -24,7 +24,7 @@ import { getErrorMessage } from '../../common/utils/error.utils';
  * - DELETE /api/auth/linkedin/:userId - Disconnect user
  * - GET /api/auth/linkedin/users - List all authenticated users (admin)
  */
-@Controller('api/auth/linkedin')
+@Controller('api/oauth/linkedin')
 export class LinkedInOAuthController {
   private readonly logger = new Logger(LinkedInOAuthController.name);
 

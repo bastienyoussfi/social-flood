@@ -73,7 +73,7 @@ export class TikTokOAuthService extends BaseOAuthService {
         this.configService.get<string>('TIKTOK_CLIENT_SECRET') || '',
       redirectUri:
         this.configService.get<string>('TIKTOK_REDIRECT_URI') ||
-        'http://localhost:3000/api/auth/tiktok/callback',
+        'http://localhost:3000/api/oauth/tiktok/callback',
       scopes: ['user.info.basic', 'video.upload', 'video.publish'],
       authorizationUrl: 'https://www.tiktok.com/v2/auth/authorize/',
       tokenUrl: 'https://open.tiktokapis.com/v2/oauth/token/',

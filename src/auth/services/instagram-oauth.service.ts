@@ -101,7 +101,7 @@ export class InstagramOAuthService extends BaseOAuthService {
       clientSecret: this.configService.get<string>('META_APP_SECRET') || '',
       redirectUri:
         this.configService.get<string>('META_REDIRECT_URI') ||
-        'http://localhost:3000/api/auth/instagram/callback',
+        'http://localhost:3000/api/oauth/instagram/callback',
       // Note: These scopes require Instagram Graph API product to be added to your Meta App
       // and permissions to be requested in App Review (works in dev mode for app admins/testers)
       scopes: [

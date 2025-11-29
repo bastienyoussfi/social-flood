@@ -24,7 +24,7 @@ import { getErrorMessage } from '../../common/utils/error.utils';
  * - DELETE /api/auth/instagram/:userId - Disconnect user
  * - GET /api/auth/instagram/users - List all authenticated users (admin)
  */
-@Controller('api/auth/instagram')
+@Controller('api/oauth/instagram')
 export class InstagramOAuthController {
   private readonly logger = new Logger(InstagramOAuthController.name);
 
