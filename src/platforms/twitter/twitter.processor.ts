@@ -16,14 +16,18 @@ export class TwitterProcessor {
     this.logger.log(`Processing Twitter post job ${job.id}`);
 
     try {
-      // Extract twitterUserId from metadata if present (for user-level OAuth 2.0 posting)
+      // Extract twitterUserId from metadata (required for OAuth 2.0 posting)
       const twitterUserId = job.data.metadata?.twitterUserId as
         | string
         | undefined;
 
-      if (twitterUserId) {
-        this.logger.log(`Posting as Twitter user: ${twitterUserId}`);
+      if (!twitterUserId) {
+        throw new Error(
+          'Twitter user ID is required in metadata. Please authenticate with Twitter first.',
+        );
       }
+
+      this.logger.log(`Posting as Twitter user: ${twitterUserId}`);
 
       const result = await this.twitterService.publishPost(
         job.data,

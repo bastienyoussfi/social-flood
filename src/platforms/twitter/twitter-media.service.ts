@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EUploadMimeType, TwitterApi } from 'twitter-api-v2';
-import { TwitterApiClient } from './twitter-api.client';
 import { MediaAttachment } from '../../common/interfaces';
 import { getErrorMessage, getErrorStack } from '../../common/utils/error.utils';
 
 /**
  * Twitter Media Service
- * Handles downloading media from URLs and uploading to Twitter
+ * Handles downloading media from URLs and uploading to Twitter using OAuth 2.0
  * Supports images (up to 4 per tweet)
  */
 @Injectable()
@@ -23,71 +22,6 @@ export class TwitterMediaService {
     'image/gif',
     'image/webp',
   ];
-
-  constructor(private readonly apiClient: TwitterApiClient) {}
-
-  /**
-   * Upload media attachments to Twitter
-   * @param media - Array of media attachments with URLs
-   * @returns Array of Twitter media IDs
-   */
-  async uploadMedia(media: MediaAttachment[]): Promise<string[]> {
-    if (!media || media.length === 0) {
-      return [];
-    }
-
-    // Validate media count
-    if (media.length > this.MAX_IMAGES) {
-      throw new Error(
-        `Twitter supports maximum ${this.MAX_IMAGES} images per tweet. Provided: ${media.length}`,
-      );
-    }
-
-    this.logger.log(`Uploading ${media.length} media item(s) to Twitter`);
-
-    const mediaIds: string[] = [];
-
-    for (let i = 0; i < media.length; i++) {
-      const attachment = media[i];
-
-      try {
-        this.logger.log(
-          `Uploading media ${i + 1}/${media.length}: ${attachment.url}`,
-        );
-
-        // For now, we only support images
-        if (attachment.type !== 'image') {
-          this.logger.warn(
-            `Skipping unsupported media type: ${attachment.type}`,
-          );
-          continue;
-        }
-
-        // Download and upload media
-        const mediaId = await this.uploadSingleImage(attachment);
-        mediaIds.push(mediaId);
-
-        this.logger.log(`Media ${i + 1} uploaded successfully: ${mediaId}`);
-      } catch (error) {
-        const errorMessage = getErrorMessage(error);
-        const errorStack = getErrorStack(error);
-
-        this.logger.error(
-          `Failed to upload media ${i + 1}: ${errorMessage}`,
-          errorStack,
-        );
-        // Continue with other media items
-        // You might want to throw here depending on your requirements
-      }
-    }
-
-    if (mediaIds.length === 0 && media.length > 0) {
-      throw new Error('Failed to upload any media attachments');
-    }
-
-    this.logger.log(`Successfully uploaded ${mediaIds.length} media item(s)`);
-    return mediaIds;
-  }
 
   /**
    * Upload media attachments to Twitter using user's OAuth 2.0 token
@@ -199,59 +133,6 @@ export class TwitterMediaService {
           });
           this.logger.log(`Alt text added to media ${mediaId}`);
         } catch (error) {
-          const errorMessage = getErrorMessage(error);
-          this.logger.warn(`Failed to add alt text: ${errorMessage}`);
-        }
-      }
-
-      return mediaId;
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      const errorStack = getErrorStack(error);
-
-      this.logger.error(`Failed to upload image: ${errorMessage}`, errorStack);
-      throw new Error(`Image upload failed: ${errorMessage}`);
-    }
-  }
-
-  /**
-   * Upload a single image to Twitter
-   * @param attachment - Media attachment with URL
-   * @returns Twitter media ID
-   */
-  private async uploadSingleImage(
-    attachment: MediaAttachment,
-  ): Promise<string> {
-    try {
-      // Download image from URL
-      const imageBuffer = await this.downloadMedia(attachment.url);
-
-      // Validate image size
-      if (imageBuffer.length > this.MAX_IMAGE_SIZE) {
-        throw new Error(
-          `Image exceeds maximum size of ${this.MAX_IMAGE_SIZE / 1024 / 1024}MB`,
-        );
-      }
-
-      // Get v1 client for media upload (media upload still uses v1.1 API)
-      const v1Client = this.apiClient.getV1Client();
-
-      // Upload to Twitter
-      const mediaId = await v1Client.v1.uploadMedia(imageBuffer, {
-        mimeType: EUploadMimeType.Png, // Twitter will handle conversion
-        additionalOwners: undefined,
-        longVideo: false,
-      });
-
-      // Add alt text if provided
-      if (attachment.alt) {
-        try {
-          await v1Client.v1.createMediaMetadata(mediaId, {
-            alt_text: { text: attachment.alt },
-          });
-          this.logger.log(`Alt text added to media ${mediaId}`);
-        } catch (error) {
-          // Alt text is optional, log but don't fail
           const errorMessage = getErrorMessage(error);
           this.logger.warn(`Failed to add alt text: ${errorMessage}`);
         }
