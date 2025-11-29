@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { TikTokController } from './tiktok.controller';
 import { TikTokAdapter } from './tiktok.adapter';
 import { TikTokService } from './tiktok.service';
 import { TikTokProcessor } from './tiktok.processor';
@@ -19,6 +20,7 @@ import { AuthModule } from '../../auth/auth.module';
  * This module imports AuthModule to access TikTokOAuthService.
  *
  * Architecture:
+ * - TikTokController: REST API endpoints for TikTok
  * - TikTokAdapter: Queue interface for posting
  * - TikTokProcessor: Processes jobs from the queue
  * - TikTokService: Orchestrates posting logic
@@ -35,6 +37,7 @@ import { AuthModule } from '../../auth/auth.module';
     }),
     forwardRef(() => AuthModule),
   ],
+  controllers: [TikTokController],
   providers: [
     TikTokApiClient,
     TikTokMediaService,

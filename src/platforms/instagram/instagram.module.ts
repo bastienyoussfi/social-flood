@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { InstagramController } from './instagram.controller';
 import { InstagramAdapter } from './instagram.adapter';
 import { InstagramService } from './instagram.service';
 import { InstagramProcessor } from './instagram.processor';
@@ -19,6 +20,7 @@ import { AuthModule } from '../../auth/auth.module';
  * This module imports AuthModule to access InstagramOAuthService.
  *
  * Architecture:
+ * - InstagramController: REST API endpoints for Instagram
  * - InstagramAdapter: Queue interface for posting
  * - InstagramProcessor: Processes jobs from the queue
  * - InstagramService: Orchestrates posting logic
@@ -41,7 +43,7 @@ import { AuthModule } from '../../auth/auth.module';
     }),
     forwardRef(() => AuthModule),
   ],
-  controllers: [],
+  controllers: [InstagramController],
   providers: [
     InstagramApiClient,
     InstagramMediaService,

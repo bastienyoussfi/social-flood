@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { LinkedInController } from './linkedin.controller';
 import { LinkedInAdapter } from './linkedin.adapter';
 import { LinkedInService } from './linkedin.service';
 import { LinkedInProcessor } from './linkedin.processor';
@@ -19,6 +20,7 @@ import { AuthModule } from '../../auth/auth.module';
  * This module imports AuthModule to access LinkedInOAuthService.
  *
  * Architecture:
+ * - LinkedInController: REST API endpoints for LinkedIn
  * - LinkedInAdapter: Queue interface for posting
  * - LinkedInProcessor: Processes jobs from the queue
  * - LinkedInService: Orchestrates posting logic
@@ -35,7 +37,7 @@ import { AuthModule } from '../../auth/auth.module';
     }),
     forwardRef(() => AuthModule),
   ],
-  controllers: [],
+  controllers: [LinkedInController],
   providers: [
     LinkedInApiClient,
     LinkedInMediaService,

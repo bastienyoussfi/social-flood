@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PinterestController } from './pinterest.controller';
 import { PinterestAdapter } from './pinterest.adapter';
 import { PinterestService } from './pinterest.service';
 import { PinterestProcessor } from './pinterest.processor';
@@ -19,6 +20,7 @@ import { AuthModule } from '../../auth/auth.module';
  * This module imports AuthModule to access PinterestOAuthService.
  *
  * Architecture:
+ * - PinterestController: REST API endpoints for Pinterest
  * - PinterestAdapter: Queue interface for posting
  * - PinterestProcessor: Processes jobs from the queue
  * - PinterestService: Orchestrates posting logic
@@ -35,7 +37,7 @@ import { AuthModule } from '../../auth/auth.module';
     }),
     forwardRef(() => AuthModule),
   ],
-  controllers: [],
+  controllers: [PinterestController],
   providers: [
     PinterestApiClient,
     PinterestMediaService,

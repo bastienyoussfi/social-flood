@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BlueskyController } from './bluesky.controller';
 import { BlueskyAdapter } from './bluesky.adapter';
 import { BlueskyService } from './bluesky.service';
 import { BlueskyProcessor } from './bluesky.processor';
@@ -15,6 +16,7 @@ import { PlatformPost, Post } from '../../database/entities';
  * Provides complete Bluesky integration with posting capabilities
  *
  * Architecture:
+ * - BlueskyController: REST API endpoints for Bluesky
  * - BlueskyAdapter: Queue interface for posting
  * - BlueskyProcessor: Processes jobs from the queue
  * - BlueskyService: Orchestrates posting logic
@@ -30,6 +32,7 @@ import { PlatformPost, Post } from '../../database/entities';
       name: 'bluesky-posts',
     }),
   ],
+  controllers: [BlueskyController],
   providers: [
     BlueskyApiClient,
     BlueskyMediaService,

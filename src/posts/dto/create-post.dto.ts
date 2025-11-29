@@ -82,33 +82,4 @@ export class CreatePostDto {
   @IsArray()
   @IsEnum(Platform, { each: true })
   platforms: Platform[];
-
-  @ApiProperty({
-    description: 'TikTok user ID (required when posting to TikTok with OAuth)',
-    required: false,
-    example: '7234567890123456789',
-  })
-  @IsOptional()
-  @IsString()
-  tiktokUserId?: string;
-
-  @ApiProperty({
-    description:
-      'Twitter user ID (optional, for posting on behalf of a user with OAuth 2.0)',
-    required: false,
-    example: '1234567890123456789',
-  })
-  @IsOptional()
-  @IsString()
-  twitterUserId?: string;
-
-  @ApiProperty({
-    description:
-      'Instagram user ID (required when posting to Instagram with OAuth)',
-    required: false,
-    example: 'user@example.com',
-  })
-  @IsOptional()
-  @IsString()
-  instagramUserId?: string;
 }

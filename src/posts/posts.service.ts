@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post, PostEntityStatus, PlatformPost } from '../database/entities';
@@ -17,6 +17,7 @@ import {
   PostStatus,
 } from '../common/interfaces';
 import { mapPostStatusToEntityStatus } from './utils/status-mapper';
+import { ConnectionsService } from '../connections/connections.service';
 
 @Injectable()
 export class PostsService {
@@ -34,6 +35,7 @@ export class PostsService {
     private readonly tiktokAdapter: TikTokAdapter,
     private readonly pinterestAdapter: PinterestAdapter,
     private readonly instagramAdapter: InstagramAdapter,
+    private readonly connectionsService: ConnectionsService,
   ) {
     // Initialize adapter registry
     this.platformAdapters = new Map<Platform, PlatformAdapter>([
@@ -46,8 +48,14 @@ export class PostsService {
     ]);
   }
 
-  async createMultiPlatformPost(createPostDto: CreatePostDto) {
-    this.logger.log('Creating multi-platform post');
+  async createMultiPlatformPost(createPostDto: CreatePostDto, userId: string) {
+    this.logger.log(`Creating multi-platform post for user ${userId}`);
+
+    // Fetch platform user IDs from social_connections
+    const platformUserIds = await this.fetchPlatformUserIds(
+      userId,
+      createPostDto.platforms,
+    );
 
     // Create post entity
     const post = this.postRepository.create({
@@ -57,22 +65,14 @@ export class PostsService {
 
     await this.postRepository.save(post);
 
-    // Prepare content
+    // Prepare content with platform-specific metadata
     const content: PostContent = {
       text: createPostDto.text,
       media: createPostDto.media,
       link: createPostDto.link,
       metadata: {
         postId: post.id,
-        ...(createPostDto.tiktokUserId && {
-          tiktokUserId: createPostDto.tiktokUserId,
-        }),
-        ...(createPostDto.twitterUserId && {
-          twitterUserId: createPostDto.twitterUserId,
-        }),
-        ...(createPostDto.instagramUserId && {
-          userId: createPostDto.instagramUserId,
-        }),
+        ...platformUserIds,
       },
     };
 
@@ -93,6 +93,74 @@ export class PostsService {
       postId: post.id,
       results: this.formatResultsForResponse(results),
     };
+  }
+
+  /**
+   * Fetch platform user IDs from social_connections table
+   */
+  private async fetchPlatformUserIds(
+    userId: string,
+    platforms: Platform[],
+  ): Promise<Record<string, string>> {
+    const platformUserIds: Record<string, string> = {};
+
+    for (const platform of platforms) {
+      // Skip Bluesky as it doesn't use OAuth connections
+      if (platform === Platform.BLUESKY) {
+        continue;
+      }
+
+      // Map Platform enum to connection service platform string
+      const platformKey = platform.toLowerCase();
+
+      // Fetch the user's connection for this platform
+      const connections =
+        await this.connectionsService.getConnectionsByPlatform(
+          userId,
+          platformKey as any,
+        );
+
+      if (connections.length === 0) {
+        throw new BadRequestException(
+          `No active ${platform} connection found. Please connect your ${platform} account first.`,
+        );
+      }
+
+      // Use the first active connection (or could let user select which one)
+      const connection = connections[0];
+
+      // Ensure platform user ID exists
+      if (!connection.platformUserId) {
+        throw new BadRequestException(
+          `${platform} connection exists but platform user ID is missing. Please reconnect your ${platform} account.`,
+        );
+      }
+
+      // Map to the metadata key expected by each platform's processor
+      switch (platform) {
+        case Platform.TWITTER:
+          platformUserIds.twitterUserId = connection.platformUserId;
+          break;
+        case Platform.TIKTOK:
+          platformUserIds.tiktokUserId = connection.platformUserId;
+          break;
+        case Platform.INSTAGRAM:
+          platformUserIds.userId = connection.platformUserId;
+          break;
+        case Platform.LINKEDIN:
+          platformUserIds.linkedinUserId = connection.platformUserId;
+          break;
+        case Platform.PINTEREST:
+          platformUserIds.pinterestUserId = connection.platformUserId;
+          break;
+      }
+
+      this.logger.log(
+        `Using ${platform} connection: ${connection.platformUsername} (${connection.platformUserId})`,
+      );
+    }
+
+    return platformUserIds;
   }
 
   private async postToAllPlatforms(
